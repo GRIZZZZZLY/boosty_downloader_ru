@@ -49,3 +49,4 @@ class DownloadingSettingsDto:
     post_text_format: str
     downloads_folder: str
     max_parallelism: int
+    layout: str = "archive"

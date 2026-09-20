@@ -206,6 +206,10 @@ async def get_download_settings() -> Optional[DownloadingSettingsDto]:
     elif max_parallelism > 30:
         max_parallelism = 30
 
+    layout = await ft.SharedPreferences().get("content-layout")
+    if layout not in ("archive", "upstream"):
+        layout = "archive"
+
     return DownloadingSettingsDto(
         need_download_photos=need_download_photos,
         need_download_videos=need_download_videos,
@@ -217,4 +221,5 @@ async def get_download_settings() -> Optional[DownloadingSettingsDto]:
         post_text_format=post_text_format,
         downloads_folder=downloads_folder,
         max_parallelism=max_parallelism,
+        layout=layout,
     )

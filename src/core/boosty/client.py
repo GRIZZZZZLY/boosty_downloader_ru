@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Union
 
 from aiohttp import ClientSession, ClientTimeout
@@ -7,6 +8,14 @@ from core.defs.common import AuthToken
 from core.logger import setup_logger
 
 logger = setup_logger()
+
+
+def _first_text_line(content: str) -> str:
+    """The plain text of a Boosty text block, which is a draft.js JSON array."""
+    try:
+        return str(json.loads(content)[0]).strip().strip("*").strip()
+    except Exception:
+        return ""
 
 
 class BoostyClient:
@@ -122,16 +131,26 @@ class BoostyClient:
             signed_query=content["signedQuery"],
         )
 
+        # The text an author writes above an attachment is its name, so it is
+        # carried over to the attachment instead of being dropped.
+        pending_headings: list[str] = []
+
         for media in content["data"]:
             wrapped_media = self._wrap_media_item(media)
-            if wrapped_media:
-                if isinstance(
-                    wrapped_media,
-                    (cdefs.BoostyTextDto, cdefs.BoostyLinkDto, cdefs.BoostyListDto),
-                ):
-                    text_content.content.append(wrapped_media)
-                else:
-                    result.media.append(wrapped_media)
+            if not wrapped_media:
+                continue
+            if isinstance(
+                wrapped_media,
+                (cdefs.BoostyTextDto, cdefs.BoostyLinkDto, cdefs.BoostyListDto),
+            ):
+                text_content.content.append(wrapped_media)
+                if isinstance(wrapped_media, cdefs.BoostyTextDto):
+                    if line := _first_text_line(wrapped_media.content):
+                        pending_headings.append(line)
+                continue
+            wrapped_media.heading_lines = pending_headings
+            pending_headings = []
+            result.media.append(wrapped_media)
 
         result.text_content = text_content
         return result

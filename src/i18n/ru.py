@@ -41,6 +41,11 @@ RU = {
     "Post text format": "Формат текста поста",
     "Markdown file (.md)": "Файл Markdown (.md)",
     "Text file (.txt)": "Текстовый файл (.txt)",
+    "Folder and file names": "Имена папок и файлов",
+    "Archive: date in folder, numbered files": (
+        "Архивная: дата в папке, файлы с номерами"
+    ),
+    "Original: post id in names": "Как у автора: id поста в именах",
     "Chunk size": "Размер блока загрузки",
     "Download timeout (sec.)": "Тайм-аут загрузки (сек.)",
     "Maximum download parallelism": "Максимум параллельных загрузок",

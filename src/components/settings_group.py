@@ -61,6 +61,20 @@ class SettingsGroup(ft.ListView):
                 ft.DropdownOption(key="raw", text=t("Text file (.txt)")),
             ],
         )
+        self.layout_dropdown = ft.Dropdown(
+            width=700,
+            value="archive",
+            label=t("Folder and file names"),
+            border_color=ft.Colors.TRANSPARENT,
+            filled=True,
+            fill_color=ft.Colors.SURFACE_CONTAINER,
+            options=[
+                ft.DropdownOption(
+                    key="archive", text=t("Archive: date in folder, numbered files")
+                ),
+                ft.DropdownOption(key="upstream", text=t("Original: post id in names")),
+            ],
+        )
         self.chunk_size_textfield = ft.TextField(
             label=t("Chunk size"),
             border=ft.UnderlineInputBorder(),
@@ -128,6 +142,7 @@ class SettingsGroup(ft.ListView):
                 controls=[
                     self.video_size_dropdown,
                     self.post_text_format_dropdown,
+                    self.layout_dropdown,
                 ],
             ),
             ft.Text(t("Download settings"), theme_style=ft.TextThemeStyle.LABEL_MEDIUM),
@@ -226,6 +241,9 @@ class SettingsGroup(ft.ListView):
         await ft.SharedPreferences().set(
             "preferred-video-size", str(self.video_size_dropdown.value)
         )
+        await ft.SharedPreferences().set(
+            "content-layout", str(self.layout_dropdown.value)
+        )
 
         self.page.show_dialog(ft.SnackBar(ft.Text(t("Saved"))))
 
@@ -242,5 +260,6 @@ class SettingsGroup(ft.ListView):
         self.current_download_folder_text.value = settings.downloads_folder
         self.video_size_dropdown.value = settings.preferred_video_size
         self.post_text_format_dropdown.value = settings.post_text_format
+        self.layout_dropdown.value = settings.layout
         self.disabled = False
         self.page.update()

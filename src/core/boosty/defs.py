@@ -38,6 +38,7 @@ class BoostyImageDto:
     width: int
     height: int
     size: int
+    heading_lines: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -53,6 +54,7 @@ class BoostyVideoDto:
     player_urls: Dict[BoostyVideoSizesType, BoostyPlayerUrlDto] = field(
         default_factory=dict
     )
+    heading_lines: List[str] = field(default_factory=list)
 
     def get_title(self) -> str:
         return f"{self.title if self.title else self.id}.mp4"
@@ -64,6 +66,7 @@ class BoostyAudioDto:
     url: str
     size: int
     title: str
+    heading_lines: List[str] = field(default_factory=list)
 
     def get_title(self) -> str:
         return self.title if self.title else f"{self.id}.mp3"
@@ -75,6 +78,7 @@ class BoostyFileDto:
     url: str
     size: int
     title: str
+    heading_lines: List[str] = field(default_factory=list)
 
 
 @dataclass

@@ -3,7 +3,6 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 from typing import Optional, List
 
 import aiofiles
@@ -23,15 +22,18 @@ from core.defs.common import DownloadingSettingsDto
 from core.defs.tasks import TaskError
 from core.draftjs_converter import DraftJsConverter
 from core.logger import setup_logger
+from core.naming import (
+    POST_TIMEZONE,
+    media_file_name,
+    post_folder_name,
+    sanitize,
+    unique_file_name,
+)
 from core.progress_counter import ProgressCounter
 from i18n import t
 from core.utils import validate_windows_dir_name, sign_url, get_download_settings
 
 logger = setup_logger()
-
-# Boosty shows post times in Moscow time, so the saved text matches the site
-# whatever the computer's own clock is set to.
-POST_TIMEZONE = ZoneInfo("Europe/Moscow")
 
 
 @dataclass
@@ -196,15 +198,41 @@ class Task:
         settings: DownloadingSettingsDto,
     ) -> List[FinalDownloadTaskDto]:
         download_items = []
+        archive = settings.layout == "archive"
+        post_title = post_info.title or ""
+        # Each attachment type is numbered on its own, so the photos in a post
+        # read 01, 02 … regardless of how many videos sit between them.
+        counters = {"photo": 0, "video": 0, "audio": 0, "file": 0}
+        # The post text is written before the attachments, so its name is
+        # already taken.
+        used_names: set[str] = {"contents.md", "contents.txt"} if archive else set()
+
+        def archive_name(kind: str, media_item, fallback: str, extension: str) -> str:
+            counters[kind] += 1
+            return unique_file_name(
+                media_file_name(
+                    counters[kind],
+                    media_item.heading_lines,
+                    fallback_title=fallback,
+                    post_title=post_title,
+                    extension=extension,
+                ),
+                used_names,
+            )
+
         for media in post_info.media:
             if (
                 isinstance(media, BoostyImageDto) and settings.need_download_photos
             ):  # photo
                 self._total_weight += media.size
+                if archive:
+                    file_name = archive_name("photo", media, "", ".jpg")
+                else:
+                    file_name = media.id + ".jpg"
                 download_items.append(
                     FinalDownloadTaskDto(
                         final_url=media.url,
-                        save_path=post_path / (media.id + ".jpg"),
+                        save_path=post_path / file_name,
                     )
                 )
 
@@ -223,11 +251,16 @@ class Task:
                                 f"Failed fetch file size for {url_info.url}"
                             )
                         self._total_weight += file_size
-                        path = post_path / validate_windows_dir_name(media.get_title())
+                        if archive:
+                            file_name = archive_name(
+                                "video", media, media.title or "", ".mp4"
+                            )
+                        else:
+                            file_name = validate_windows_dir_name(media.get_title())
                         download_items.append(
                             FinalDownloadTaskDto(
                                 final_url=url_info.url,
-                                save_path=path,
+                                save_path=post_path / file_name,
                             )
                         )
                         break
@@ -237,11 +270,19 @@ class Task:
             ):  # audio
                 if post_info.signed_query:
                     self._total_weight += media.size
-                    path = post_path / validate_windows_dir_name(media.get_title())
+                    if archive:
+                        counters["audio"] += 1
+                        file_name = unique_file_name(
+                            sanitize(media.title)
+                            or f"audio{counters['audio']:02d}.mp3",
+                            used_names,
+                        )
+                    else:
+                        file_name = validate_windows_dir_name(media.get_title())
                     download_items.append(
                         FinalDownloadTaskDto(
                             final_url=sign_url(media.url, post_info.signed_query),
-                            save_path=path,
+                            save_path=post_path / file_name,
                         )
                     )
 
@@ -250,11 +291,18 @@ class Task:
             ):  # file
                 if post_info.signed_query:
                     self._total_weight += media.size
-                    path = post_path / validate_windows_dir_name(media.title)
+                    if archive:
+                        counters["file"] += 1
+                        file_name = unique_file_name(
+                            sanitize(media.title) or f"file{counters['file']:02d}",
+                            used_names,
+                        )
+                    else:
+                        file_name = validate_windows_dir_name(media.title)
                     download_items.append(
                         FinalDownloadTaskDto(
                             final_url=sign_url(media.url, post_info.signed_query),
-                            save_path=path,
+                            save_path=post_path / file_name,
                         )
                     )
 
@@ -310,14 +358,16 @@ class Task:
                 logger.error("Failed create or check home directory", exc_info=e)
                 return self._fallback(TaskError.NO_HOME_FOLDER)
 
-            post_path = Path(settings.downloads_folder) / self.author / self.post_id
-            if post_info.title:
-                if title := validate_windows_dir_name(post_info.title):
-                    post_path = (
-                        Path(settings.downloads_folder)
-                        / self.author
-                        / (title + "_" + self.post_id)
-                    )
+            author_path = Path(settings.downloads_folder) / self.author
+            if settings.layout == "archive":
+                post_path = author_path / post_folder_name(
+                    post_info.title or "", post_info.publish_time, self.post_id
+                )
+            else:
+                post_path = author_path / self.post_id
+                if post_info.title:
+                    if title := validate_windows_dir_name(post_info.title):
+                        post_path = author_path / (title + "_" + self.post_id)
 
             self.path = post_path
             if not os.path.isdir(post_path):
@@ -352,11 +402,9 @@ class Task:
                 text_content = None
 
             if text_content:
-                text_file_path = post_path / (
-                    "content.txt"
-                    if settings.post_text_format == "raw"
-                    else "content.md"
-                )
+                stem = "contents" if settings.layout == "archive" else "content"
+                suffix = ".txt" if settings.post_text_format == "raw" else ".md"
+                text_file_path = post_path / (stem + suffix)
                 if text_file_path.exists():
                     logger.info(
                         f"Skip creating text file: {text_file_path} (already exists)"
