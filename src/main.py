@@ -5,6 +5,7 @@ import flet as ft
 import __version__ as app_version
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
+from core.utils import get_download_settings
 from pages.auth_management import AuthManagementPage
 from pages.download_image_by_link import DownloadImageByLinkPage
 from pages.download_post import DownloadPostPage
@@ -33,7 +34,10 @@ async def main(page: ft.Page):
     page.window.height = 750
     page.window.min_height = 500
 
-    manager = DownloadManager()
+    settings = await get_download_settings()
+    manager = DownloadManager(
+        maximum_concurrency=settings.max_parallelism if settings else 5
+    )
 
     def route_change(e):
         page.views.clear()

@@ -30,6 +30,7 @@ from core.naming import (
     unique_file_name,
 )
 from core.progress_counter import ProgressCounter
+from core.verify import verify_download
 from i18n import t
 from core.utils import validate_windows_dir_name, sign_url, get_download_settings
 
@@ -40,6 +41,12 @@ logger = setup_logger()
 class FinalDownloadTaskDto:
     final_url: str
     save_path: Path
+    expected_size: Optional[int] = None
+
+
+# How many times one file is retried before the task gives up on it.
+DOWNLOAD_ATTEMPTS = 3
+RETRY_PAUSE_SECONDS = 5
 
 
 class Task:
@@ -151,6 +158,31 @@ class Task:
         self._count_files = 0
         self.launch()
 
+    def _advance_progress(self, amount: int, pbar: ProgressCounter) -> None:
+        self._downloaded_bytes += amount
+        pbar.update(amount)
+        # A retry re-counts bytes it already reported, so the bar is clamped.
+        self._percent = min((pbar.n / (pbar.total or 1)) * 100, 100)
+
+    def _already_downloaded(
+        self, save_path: Path, expected_size: Optional[int]
+    ) -> bool:
+        """True when the file on disk is whole and can be left alone.
+
+        A file that is merely present is not enough: an interrupted download
+        used to be treated as finished, which is how a truncated archive
+        survives unnoticed. The damaged file is left in place until the new
+        one has been downloaded and checked, so a failed retry never costs
+        what was already there.
+        """
+        if not save_path.exists():
+            return False
+        problem = verify_download(save_path, expected_size)
+        if problem is None:
+            return True
+        logger.warning(f"Re-downloading {save_path.name}: {problem}")
+        return False
+
     async def _download_file(
         self,
         session: ClientSession,
@@ -158,32 +190,47 @@ class Task:
         save_path: Path,
         pbar: ProgressCounter,
         chunk_size: int = 153600,
+        expected_size: Optional[int] = None,
     ):
-        if save_path.exists():
-            logger.info(f"Skip downloading file {save_path} (already exists)")
+        if self._already_downloaded(save_path, expected_size):
+            logger.info(f"Skip downloading file {save_path} (already complete)")
             await session.close()
-            size = save_path.stat().st_size
-            self._downloaded_bytes += size
-            pbar.update(size)
-            total = pbar.total or 1
-            self._percent = (pbar.n / total) * 100
+            self._advance_progress(save_path.stat().st_size, pbar)
             return
+
+        # The bytes land in a .part file, so an interrupted download is
+        # resumable and is never mistaken for a finished one.
+        part_path = save_path.with_suffix(save_path.suffix + ".part")
+        have = part_path.stat().st_size if part_path.exists() else 0
+        headers = {"Range": f"bytes={have}-"} if have else {}
+
         async with session:
-            logger.info(f"Downloading file {file_url}")
-            async with session.get(file_url) as response:
+            logger.info(f"Downloading file {file_url} (have {have} bytes)")
+            async with session.get(file_url, headers=headers) as response:
                 logger.debug(f"Got response {response.status}")
+                if response.status == 416:  # nothing left to resume
+                    part_path.replace(save_path)
+                    self._advance_progress(have, pbar)
+                    return
                 response.raise_for_status()
-                async with aiofiles.open(save_path, "wb") as f:
-                    logger.debug(f"Writing file {save_path}")
+                if response.status == 200 and have:
+                    logger.info("Server ignored Range, starting over")
+                    have = 0
+                if have:
+                    self._advance_progress(have, pbar)
+                mode = "ab" if have else "wb"
+                async with aiofiles.open(part_path, mode) as f:
+                    logger.debug(f"Writing file {part_path}")
                     async for chunk in response.content.iter_chunked(chunk_size):
                         if not chunk:
                             continue
                         await f.write(chunk)
-                        new_chunk_size = len(chunk)
-                        self._downloaded_bytes += new_chunk_size
-                        pbar.update(new_chunk_size)
-                        total = pbar.total or 1
-                        self._percent = (pbar.n / total) * 100
+                        self._advance_progress(len(chunk), pbar)
+
+        problem = verify_download(part_path, expected_size)
+        if problem:
+            raise ValueError(f"{save_path.name} is damaged: {problem}")
+        part_path.replace(save_path)
 
     def _fallback(self, err: TaskError) -> None:
         self._error = True
@@ -233,6 +280,7 @@ class Task:
                     FinalDownloadTaskDto(
                         final_url=media.url,
                         save_path=post_path / file_name,
+                        expected_size=media.size,
                     )
                 )
 
@@ -261,6 +309,7 @@ class Task:
                             FinalDownloadTaskDto(
                                 final_url=url_info.url,
                                 save_path=post_path / file_name,
+                                expected_size=file_size,
                             )
                         )
                         break
@@ -283,6 +332,7 @@ class Task:
                         FinalDownloadTaskDto(
                             final_url=sign_url(media.url, post_info.signed_query),
                             save_path=post_path / file_name,
+                            expected_size=media.size,
                         )
                     )
 
@@ -303,6 +353,7 @@ class Task:
                         FinalDownloadTaskDto(
                             final_url=sign_url(media.url, post_info.signed_query),
                             save_path=post_path / file_name,
+                            expected_size=media.size,
                         )
                     )
 
@@ -423,18 +474,31 @@ class Task:
             self._count_files = len(download_items)
             with ProgressCounter(total=self._total_weight) as pbar:
                 for media in download_items:
-                    session = client.get_client_session()
-                    try:
-                        await self._download_file(
-                            session=session,
-                            file_url=media.final_url,
-                            save_path=media.save_path,
-                            pbar=pbar,
-                            chunk_size=settings.chunk_size,
-                        )
-                    except Exception as e:
-                        logger.error("Error downloading file", exc_info=e)
-                        return self._fallback(TaskError.ERROR)
+                    # A dropped connection retries from where the .part file
+                    # stopped, instead of failing the whole post.
+                    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+                        session = client.get_client_session()
+                        try:
+                            await self._download_file(
+                                session=session,
+                                file_url=media.final_url,
+                                save_path=media.save_path,
+                                pbar=pbar,
+                                chunk_size=settings.chunk_size,
+                                expected_size=media.expected_size,
+                            )
+                            break
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as e:
+                            logger.error(
+                                f"Error downloading {media.save_path.name}, "
+                                f"attempt {attempt} of {DOWNLOAD_ATTEMPTS}",
+                                exc_info=e,
+                            )
+                            if attempt == DOWNLOAD_ATTEMPTS:
+                                return self._fallback(TaskError.ERROR)
+                            await asyncio.sleep(RETRY_PAUSE_SECONDS)
                     await asyncio.sleep(0.1)
 
             self._done = True
