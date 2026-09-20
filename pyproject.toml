@@ -17,6 +17,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "flet[all]>=0.80.2",
+  "pytest>=9.1.1",
 ]
 
 [tool.flet]

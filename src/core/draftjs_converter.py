@@ -57,13 +57,26 @@ class DraftJsConverter:
 
         return "".join(result_text)
 
-    def _process_list(self, list_dto: BoostyListDto, level: int = 0) -> List[str]:
-        """Рекурсивно обрабатывает BoostyListDto."""
+    @staticmethod
+    def _list_items(list_dto) -> list:
+        """Пункты списка.
+
+        Верхний уровень приходит как BoostyListDto, а вложенные списки — как
+        обычные словари из ответа API, поэтому рекурсия должна понимать оба.
+        """
+        if isinstance(list_dto, BoostyListDto):
+            return list_dto.items or []
+        if isinstance(list_dto, dict):
+            return list_dto.get("items") or []
+        return []
+
+    def _process_list(self, list_dto, level: int = 0) -> List[str]:
+        """Рекурсивно обрабатывает список."""
         lines = []
         prefix = "* "
         indent = "    " * level
 
-        for item in list_dto.items:
+        for item in self._list_items(list_dto):
             item_text_parts = []
             for text_dto in item.get("data", []):
                 text, _, styles = self._parse_boosty_text(text_dto.get("content"))
@@ -73,9 +86,8 @@ class DraftJsConverter:
             if combined_text:
                 lines.append(f"{indent}{prefix}{combined_text}")
 
-            if item.items:
-                for sub_list in item.get("items", []):
-                    lines.extend(self._process_list(sub_list, level + 1))
+            for sub_list in item.get("items") or []:
+                lines.extend(self._process_list(sub_list, level + 1))
             lines.append("\n\n")
         return lines
 
@@ -107,12 +119,13 @@ class DraftJsConverter:
         def process_plain_list(list_dto, level=0):
             lines = []
             indent = "  " * level
-            for i in list_dto.items:
+            for i in self._list_items(list_dto):
                 text_parts = [
-                    self._parse_boosty_text(d.get("content"))[0] for d in i.get("data")
+                    self._parse_boosty_text(d.get("content"))[0]
+                    for d in i.get("data") or []
                 ]
                 lines.append(f"{indent}- {''.join(text_parts)}")
-                for sub in i.get("items"):
+                for sub in i.get("items") or []:
                     lines.extend(process_plain_list(sub, level + 1))
                 lines.append("\n")
             return lines

@@ -150,7 +150,7 @@ class SettingsGroup(ft.ListView):
 
     async def apply_settings(self):
         new_chunk_size = self.chunk_size_textfield.value
-        if not new_chunk_size or 500000 < int(new_chunk_size) < 10000:
+        if not new_chunk_size or not 10000 <= int(new_chunk_size) <= 500000:
             self.page.show_dialog(
                 ft.AlertDialog(
                     title=ft.Text("Chunk size"),
@@ -184,7 +184,7 @@ class SettingsGroup(ft.ListView):
             return
 
         new_max_parallelism = self.max_parallelism_textfield.value
-        if not new_max_parallelism or 10 < int(new_max_parallelism) < 1:
+        if not new_max_parallelism or not 1 <= int(new_max_parallelism) <= 10:
             self.page.show_dialog(
                 ft.AlertDialog(
                     title=ft.Text("Maximum download parallelism"),
