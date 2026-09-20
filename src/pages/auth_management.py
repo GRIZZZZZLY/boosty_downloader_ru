@@ -8,6 +8,7 @@ import flet as ft
 
 import components
 from core.authorization_provider import AuthorizationProvider
+from core.browser_login import BrowserLoginError, login_through_browser
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
 from i18n import t
@@ -37,6 +38,15 @@ class AuthManagementPage(ft.View):
             hint_style=ft.TextStyle(color=ft.Colors.GREY_600),
         )
         self.manager = manager
+        self.browser_login_button = ft.Button(
+            t("Open a browser and log in"),
+            icon=ft.Icon(ft.Icons.OPEN_IN_BROWSER, color=ft.Colors.PRIMARY),
+            color=ft.Colors.ON_SURFACE,
+            height=50,
+            width=300,
+            on_click=self.login_through_browser,
+        )
+        self.browser_login_status = ft.Text("", color=ft.Colors.ON_SURFACE_VARIANT)
         self.auth_view = ft.ListView(
             spacing=10,
             padding=20,
@@ -45,6 +55,26 @@ class AuthManagementPage(ft.View):
             auto_scroll=True,
             expand=True,
             controls=[
+                ft.Text(
+                    t("The simple way: through a browser"),
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                ft.Text(
+                    t(
+                        "A browser window opens on boosty.to. Log in there as usual, "
+                        "and the app picks the login up by itself. The window uses a "
+                        "separate profile and closes on its own."
+                    )
+                ),
+                self.browser_login_button,
+                self.browser_login_status,
+                ft.Divider(),
+                ft.Text(
+                    t("Or by hand, through the browser console"),
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                ),
                 ft.Text(t("1. Copy script"), size=20, weight=ft.FontWeight.BOLD),
                 ft.Text(t("Click the button to copy script:")),
                 self.copy_script_button,
@@ -212,6 +242,47 @@ class AuthManagementPage(ft.View):
                 ft.Icons.COPY, color=ft.Colors.PRIMARY
             )
             self.page.update()
+
+    async def login_through_browser(self, *_):
+        self.browser_login_button.disabled = True
+        self.browser_login_status.value = t("Opening a browser...")
+        self.page.update()
+
+        def report(_state: str) -> None:
+            self.browser_login_status.value = t("Waiting for you to log in...")
+            self.page.update()
+
+        try:
+            auth_token = await login_through_browser(on_status=report)
+        except BrowserLoginError as e:
+            logger.error("Browser login failed", exc_info=e)
+            self.browser_login_button.disabled = False
+            self.browser_login_status.value = ""
+            self.page.update()
+            self.page.show_dialog(
+                ft.AlertDialog(
+                    title=ft.Text(t("Could not log in through a browser")),
+                    content=ft.Text(
+                        t(
+                            "Log in with the console script below, it does not need a "
+                            "browser the app can drive."
+                        )
+                    ),
+                    actions=[
+                        ft.TextButton(
+                            t("Ok"), on_click=lambda e: self.page.pop_dialog()
+                        )
+                    ],
+                    open=True,
+                )
+            )
+            return
+
+        await AuthorizationProvider.authorize(auth_token)
+        self.browser_login_button.disabled = False
+        self.browser_login_status.value = ""
+        self.build()
+        self.page.update()
 
     async def save_new_token(self):
         value = self.token_text_field.value.strip()

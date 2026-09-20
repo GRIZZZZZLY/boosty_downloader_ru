@@ -68,6 +68,21 @@ RU = {
     "System": "Как в системе",
     # --- authorization ---------------------------------------------------
     "Authorization management": "Управление входом",
+    "The simple way: through a browser": "Простой способ: через браузер",
+    "A browser window opens on boosty.to. Log in there as usual, and the app picks the login up by itself. The window uses a separate profile and closes on its own.": (
+        "Откроется окно браузера на boosty.to. Войдите там как обычно — "
+        "приложение подхватит вход само. Окно работает на отдельном профиле "
+        "и закроется самостоятельно."
+    ),
+    "Open a browser and log in": "Открыть браузер и войти",
+    "Opening a browser...": "Открываю браузер...",
+    "Waiting for you to log in...": "Жду, пока вы войдёте...",
+    "Could not log in through a browser": "Не получилось войти через браузер",
+    "Log in with the console script below, it does not need a browser the app can drive.": (
+        "Войдите через консольный скрипт ниже — ему браузер под управлением "
+        "приложения не нужен."
+    ),
+    "Or by hand, through the browser console": "Или вручную, через консоль браузера",
     "Copy login script": "Скопировать скрипт входа",
     "1. Copy script": "1. Скопируйте скрипт",
     "Click the button to copy script:": "Нажмите кнопку, чтобы скопировать скрипт:",
