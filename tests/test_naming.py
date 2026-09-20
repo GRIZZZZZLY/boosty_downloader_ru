@@ -1,4 +1,5 @@
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,18 @@ def test_folder_date_uses_moscow_time_not_the_local_clock():
     assert post_folder_name("Ночной пост", late_evening_utc, "id").startswith(
         "2024-07-02"
     )
+
+
+def test_moscow_offset_needs_no_timezone_database():
+    """The Python bundled into the built app carries no tzdata.
+
+    Asking zoneinfo for 'Europe/Moscow' there raises at import time and the
+    app never starts, so the offset has to be built in.
+    """
+    import core.naming as naming
+
+    assert naming.POST_TIMEZONE.utcoffset(None) == timedelta(hours=3)
+    assert "zoneinfo" not in sys.modules or not hasattr(naming, "ZoneInfo")
 
 
 def test_folder_name_falls_back_to_the_post_id():

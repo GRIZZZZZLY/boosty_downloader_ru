@@ -9,9 +9,8 @@ Pure functions only, so they can be tested without the network or Flet.
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from core.utils import validate_windows_dir_name
 
@@ -26,7 +25,15 @@ __all__ = [
 
 # Boosty shows post times in Moscow time, so a folder date matches the site
 # whatever the computer's own clock is set to.
-POST_TIMEZONE = ZoneInfo("Europe/Moscow")
+#
+# A fixed offset rather than ZoneInfo("Europe/Moscow"): the Python bundled
+# into the built app carries no time zone database, so ZoneInfo raises at
+# import and the app does not start. Moscow has had no daylight saving since
+# October 2014 and Boosty is younger than that, so the offset is exact for
+# every post.
+# ponytail: fixed +03:00; switch to ZoneInfo and add the tzdata package if
+# another time zone is ever needed.
+POST_TIMEZONE = timezone(timedelta(hours=3), "MSK")
 
 ILLEGAL_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 WHITESPACE = re.compile(r"\s+")
