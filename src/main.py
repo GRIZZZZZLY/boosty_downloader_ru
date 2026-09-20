@@ -15,9 +15,15 @@ from pages.merge_author_content import MergeAuthorContentPage
 from pages.settings_page import SettingsPage
 from pages.welcome_page import WelcomePage
 from themes import LIGHT_THEME, DARK_THEME
+from components.language_picker import load_saved_language
+from i18n import t
 
 
 async def main(page: ft.Page):
+    # Labels are translated while a page is built, so the language has to be
+    # known before the first view is created.
+    await load_saved_language()
+
     page.title = f"{app_version.NAME} {app_version.VERSION}"
     page.theme = LIGHT_THEME
     page.dark_theme = DARK_THEME
@@ -63,12 +69,12 @@ async def main(page: ft.Page):
         if await manager.get_active_tasks_count() > 0:
             page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Some downloads are incomplete"),
-                    content=ft.Text("Are you sure you want to exit the app?"),
+                    title=ft.Text(t("Some downloads are incomplete")),
+                    content=ft.Text(t("Are you sure you want to exit the app?")),
                     actions=[
-                        ft.TextButton("No", on_click=lambda e: page.pop_dialog()),
+                        ft.TextButton(t("No"), on_click=lambda e: page.pop_dialog()),
                         ft.TextButton(
-                            "Yes",
+                            t("Yes"),
                             on_click=lambda e: asyncio.create_task(
                                 page.window.destroy()
                             ),

@@ -6,6 +6,7 @@ import flet as ft
 import components
 from core.downloads_manager import DownloadManager
 import __version__ as app_version
+from i18n import t
 
 
 class FeedbackAndBugsPage(ft.View):
@@ -29,7 +30,7 @@ class FeedbackAndBugsPage(ft.View):
             height=300,
         )
         self.copy_button = ft.Button(
-            "Copy diagnostic",
+            t("Copy diagnostic"),
             icon=ft.Icon(ft.Icons.COPY, color=ft.Colors.PRIMARY),
             color=ft.Colors.ON_SURFACE,
             height=45,
@@ -42,15 +43,17 @@ class FeedbackAndBugsPage(ft.View):
                     ft.IconButton(
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
-                    ft.Text("Feedback and bugs", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(t("Feedback and bugs"), size=24, weight=ft.FontWeight.BOLD),
                 ]
             ),
             ft.Column(
                 spacing=10,
                 controls=[
                     ft.Text(
-                        "If you'd like to leave feedback about the app or suggest a new feature, "
-                        "please create a discussion thread in the project repository:"
+                        t(
+                            "If you'd like to leave feedback about the app or suggest a new feature, "
+                            "please create a discussion thread in the project repository:"
+                        )
                     ),
                     ft.Row(
                         spacing=5,
@@ -60,7 +63,7 @@ class FeedbackAndBugsPage(ft.View):
                             ft.Text(
                                 spans=[
                                     ft.TextSpan(
-                                        "New project discussion",
+                                        t("New project discussion"),
                                         url=app_version.URL + "/discussions/new/choose",
                                         style=ft.TextStyle(
                                             weight=ft.FontWeight.BOLD,
@@ -74,7 +77,9 @@ class FeedbackAndBugsPage(ft.View):
                         ],
                     ),
                     ft.Text(
-                        "If you encounter a bug, please report it in the project issues section:"
+                        t(
+                            "If you encounter a bug, please report it in the project issues section:"
+                        )
                     ),
                     ft.Row(
                         spacing=5,
@@ -83,7 +88,7 @@ class FeedbackAndBugsPage(ft.View):
                             ft.Text(
                                 spans=[
                                     ft.TextSpan(
-                                        "New project issue",
+                                        t("New project issue"),
                                         url=app_version.URL + "/issues/new",
                                         style=ft.TextStyle(
                                             weight=ft.FontWeight.BOLD,
@@ -99,7 +104,9 @@ class FeedbackAndBugsPage(ft.View):
                     ft.Column(
                         [
                             ft.Text(
-                                "To speed up the bug fix, please include diagnostic information with the issue:"
+                                t(
+                                    "To speed up the bug fix, please include diagnostic information with the issue:"
+                                )
                             ),
                             self.logs_field,
                             self.copy_button,

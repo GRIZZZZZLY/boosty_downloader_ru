@@ -5,6 +5,7 @@ from typing import Optional, Callable, Awaitable
 import flet as ft
 
 from core.defs.tasks import TaskInfo, TASK_ERROR_STATUS_LINE
+from i18n import t
 
 
 @ft.control
@@ -111,10 +112,16 @@ class TaskItem(ft.Container):
         self.task_prefix.value = task_prefix
         self.path = self.task_info.path
         if self.task_info.total_weight < 1024**3:
-            weight = f"{self.task_info.total_weight / 1024 ** 2:.1f} MB"
+            weight = t("{size} MB").format(
+                size=f"{self.task_info.total_weight / 1024 ** 2:.1f}"
+            )
         else:
-            weight = f"{self.task_info.total_weight / 1024 ** 3:.1f} GB"
-        self.task_weight.value = f"{self.task_info.count_files} files, {weight}"
+            weight = t("{size} GB").format(
+                size=f"{self.task_info.total_weight / 1024 ** 3:.1f}"
+            )
+        self.task_weight.value = t("{count} files, {weight}").format(
+            count=self.task_info.count_files, weight=weight
+        )
         if self.task_info.finished:
             if self.task_info.error:
                 err_icon, err_descr = TASK_ERROR_STATUS_LINE[self.task_info.error]
@@ -127,7 +134,7 @@ class TaskItem(ft.Container):
                             size=15,
                         ),
                         ft.Text(
-                            err_descr,
+                            t(err_descr),
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.ON_SURFACE_VARIANT,
                         ),
@@ -145,7 +152,7 @@ class TaskItem(ft.Container):
                             size=15,
                         ),
                         ft.Text(
-                            "Complete",
+                            t("Complete"),
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.ON_SURFACE_VARIANT,
                         ),

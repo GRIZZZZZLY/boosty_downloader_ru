@@ -2,6 +2,7 @@ import flet as ft
 
 import components
 from core.downloads_manager import DownloadManager
+from i18n import t
 
 
 class SettingsPage(ft.View):
@@ -15,7 +16,7 @@ class SettingsPage(ft.View):
                     ft.IconButton(
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
-                    ft.Text("Settings", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(t("Settings"), size=24, weight=ft.FontWeight.BOLD),
                 ]
             ),
             components.SettingsGroup(),

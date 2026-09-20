@@ -9,6 +9,7 @@ from core.boosty.client import BoostyClient
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
 from core.utils import parse_author_link
+from i18n import t
 
 logger = setup_logger()
 
@@ -57,12 +58,12 @@ class DownloadSeveralPostsPage(ft.View):
         self.date_from_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD)
         self.date_to_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD)
         self.status_text = ft.Text(
-            "Preparing...",
+            t("Preparing..."),
             size=16,
             weight=ft.FontWeight.W_600,
         )
         self.description_text = ft.Text(
-            "0 posts found",
+            t("{count} posts found").format(count=0),
             size=12,
             weight=ft.FontWeight.W_400,
         )
@@ -97,7 +98,7 @@ class DownloadSeveralPostsPage(ft.View):
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
                     ft.Text(
-                        "Download several posts", size=24, weight=ft.FontWeight.BOLD
+                        t("Download several posts"), size=24, weight=ft.FontWeight.BOLD
                     ),
                 ]
             ),
@@ -110,7 +111,7 @@ class DownloadSeveralPostsPage(ft.View):
                     spacing=15,
                     controls=[
                         self.text_field,
-                        ft.Text("Download posts published at:"),
+                        ft.Text(t("Download posts published at:")),
                         ft.Row(
                             [
                                 self.date_from_text,
@@ -127,7 +128,7 @@ class DownloadSeveralPostsPage(ft.View):
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         ),
                         ft.Button(
-                            content=ft.Text("Download", size=17),
+                            content=ft.Text(t("Download"), size=17),
                             icon=ft.Icon(
                                 ft.Icons.DOWNLOAD, color=ft.Colors.PRIMARY, size=16
                             ),
@@ -174,11 +175,13 @@ class DownloadSeveralPostsPage(ft.View):
         if self.text_field.value.strip() == "":
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Empty author"),
-                    content=ft.Text("Type link to author's page or author's nickname"),
+                    title=ft.Text(t("Empty author")),
+                    content=ft.Text(
+                        t("Type link to author's page or author's nickname")
+                    ),
                     actions=[
                         ft.TextButton(
-                            "Wow, i'll", on_click=lambda e: self.page.pop_dialog()
+                            t("Wow, i'll"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -200,12 +203,16 @@ class DownloadSeveralPostsPage(ft.View):
         if not max_int_id:
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Empty page"),
+                    title=ft.Text(t("Empty page")),
                     content=ft.Text(
-                        "An error has occurred, or author have no posts. Please try again later."
+                        t(
+                            "An error has occurred, or author have no posts. Please try again later."
+                        )
                     ),
                     actions=[
-                        ft.TextButton("Ok", on_click=lambda ev: self.page.pop_dialog())
+                        ft.TextButton(
+                            t("Ok"), on_click=lambda ev: self.page.pop_dialog()
+                        )
                     ],
                     open=True,
                 )
@@ -215,7 +222,7 @@ class DownloadSeveralPostsPage(ft.View):
             self.page.update()
             return
 
-        self.status_text.value = "Searching posts by your criteria..."
+        self.status_text.value = t("Searching posts by your criteria...")
         self.page.update()
         left_border = int(self.parse_from.astimezone(datetime.timezone.utc).timestamp())
         right_border = int(self.parse_to.astimezone(datetime.timezone.utc).timestamp())
@@ -229,13 +236,15 @@ class DownloadSeveralPostsPage(ft.View):
                 logger.error(e)
                 self.page.show_dialog(
                     ft.AlertDialog(
-                        title=ft.Text("Unexpected error on checking posts"),
+                        title=ft.Text(t("Unexpected error on checking posts")),
                         content=ft.Text(
-                            "An error has occurred when searching posts. Please, check url correctness or try again later."
+                            t(
+                                "An error has occurred when searching posts. Please, check url correctness or try again later."
+                            )
                         ),
                         actions=[
                             ft.TextButton(
-                                "Ok", on_click=lambda ev: self.page.pop_dialog()
+                                t("Ok"), on_click=lambda ev: self.page.pop_dialog()
                             )
                         ],
                         open=True,
@@ -255,17 +264,21 @@ class DownloadSeveralPostsPage(ft.View):
 
             if post_list.extra.is_last:
                 run = False
-            self.description_text.value = f"{len(prepared_posts)} posts found"
+            self.description_text.value = t("{count} posts found").format(
+                count=len(prepared_posts)
+            )
             self.page.update()
             await asyncio.sleep(0.5)
 
-        self.status_text.value = "Creating tasks in the manager"
+        self.status_text.value = t("Creating tasks in the manager")
         tasks_created = 0
         for post in prepared_posts:
             if await self.manager.add_task(author_name, post.id, post):
                 tasks_created += 1
             await asyncio.sleep(0.1)
-            self.description_text.value = f"{tasks_created} tasks created"
+            self.description_text.value = t("{count} tasks created").format(
+                count=tasks_created
+            )
             self.page.update()
 
         self.progress_container.visible = False

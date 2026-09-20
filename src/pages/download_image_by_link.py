@@ -10,6 +10,7 @@ from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
 from core.progress_counter import ProgressCounter
 from core.utils import parse_image_link, get_download_settings
+from i18n import t
 
 logger = setup_logger()
 
@@ -20,7 +21,7 @@ class DownloadImageByLinkPage(ft.View):
         self.route = "/download-media-by-link"
         self.destination_folder_valid = False
         self.current_destination_folder_text = ft.Text(
-            value="Choose download folder",
+            value=t("Choose download folder"),
             size=20,
             color=ft.Colors.ON_SURFACE_VARIANT,
             width=430,
@@ -66,7 +67,7 @@ class DownloadImageByLinkPage(ft.View):
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
                     ft.Text(
-                        "Download image by link", size=24, weight=ft.FontWeight.BOLD
+                        t("Download image by link"), size=24, weight=ft.FontWeight.BOLD
                     ),
                 ]
             ),
@@ -76,12 +77,14 @@ class DownloadImageByLinkPage(ft.View):
                         [
                             self.progress,
                             ft.Text(
-                                "Paste here link to the image (from feed or direct messages)"
+                                t(
+                                    "Paste here link to the image (from feed or direct messages)"
+                                )
                             ),
                             self.text_field,
                             self.destination_folder_picker,
                             ft.Button(
-                                content=ft.Text("Download", size=17),
+                                content=ft.Text(t("Download"), size=17),
                                 icon=ft.Icon(
                                     ft.Icons.DOWNLOAD, color=ft.Colors.PRIMARY, size=16
                                 ),
@@ -134,14 +137,16 @@ class DownloadImageByLinkPage(ft.View):
         if not link_uuid:
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Not this link"),
+                    title=ft.Text(t("Not this link")),
                     content=ft.Text(
-                        "This utility is for download a PICTURE using a direct link (to picture) from "
-                        "the posts list or private messages (you can get this link in the browser address bar)."
+                        t(
+                            "This utility is for download a PICTURE using a direct link (to picture) from "
+                            "the posts list or private messages (you can get this link in the browser address bar)."
+                        )
                     ),
                     actions=[
                         ft.TextButton(
-                            "I get it", on_click=lambda ev: self.page.pop_dialog()
+                            t("I get it"), on_click=lambda ev: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -152,11 +157,11 @@ class DownloadImageByLinkPage(ft.View):
         if not base_path.exists():
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Folder does not exist"),
-                    content=ft.Text("Download folder does not exist"),
+                    title=ft.Text(t("Folder does not exist")),
+                    content=ft.Text(t("Download folder does not exist")),
                     actions=[
                         ft.TextButton(
-                            "Ok, i'll create",
+                            t("Ok, i'll create"),
                             on_click=lambda ev: self.page.pop_dialog(),
                         )
                     ],
@@ -168,11 +173,11 @@ class DownloadImageByLinkPage(ft.View):
         if download_path.exists():
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Already exists"),
-                    content=ft.Text("File with this name already exists"),
+                    title=ft.Text(t("Already exists")),
+                    content=ft.Text(t("File with this name already exists")),
                     actions=[
                         ft.TextButton(
-                            "Understood", on_click=lambda e: self.page.pop_dialog()
+                            t("Understood"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -212,7 +217,7 @@ class DownloadImageByLinkPage(ft.View):
                                 total = pbar.total or chunk_size
                                 self.progress.value = pbar.n / total
                                 self.progress.update()
-            self.page.show_dialog(ft.SnackBar(ft.Text("Saved")))
+            self.page.show_dialog(ft.SnackBar(ft.Text(t("Saved"))))
         except Exception as e:
             logger.error("Failed to download image", exc_info=e)
         finally:

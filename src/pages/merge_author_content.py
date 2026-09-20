@@ -9,6 +9,7 @@ import components
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
 from core.utils import get_download_settings
+from i18n import t
 
 logger = setup_logger()
 
@@ -24,23 +25,23 @@ class MergeAuthorContentPage(ft.View):
             border_color=ft.Colors.TRANSPARENT,
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
-            label="Action",
+            label=t("Action"),
             value="copy",
             options=[
-                ft.DropdownOption(key="copy", text="Copy"),
-                ft.DropdownOption(key="move", text="Move"),
+                ft.DropdownOption(key="copy", text=t("Copy")),
+                ft.DropdownOption(key="move", text=t("Move")),
             ],
         )
         self.authors_dropdown = ft.Dropdown(
             width=500,
-            label="Choose author's folder",
+            label=t("Choose author's folder"),
             border_color=ft.Colors.TRANSPARENT,
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             on_select=self.update_state,
         )
         self.current_merge_folder_text = ft.Text(
-            value="Choose destination folder",
+            value=t("Choose destination folder"),
             size=20,
             color=ft.Colors.ON_SURFACE_VARIANT,
             width=430,
@@ -66,19 +67,19 @@ class MergeAuthorContentPage(ft.View):
             on_click=self.pick_destination_folder,
         )
         self.merge_photos_check = ft.Checkbox(
-            label="Photos", value=False, on_change=self.update_state
+            label=t("Photos"), value=False, on_change=self.update_state
         )
         self.merge_videos_check = ft.Checkbox(
-            label="Videos", value=False, on_change=self.update_state
+            label=t("Videos"), value=False, on_change=self.update_state
         )
         self.merge_audios_check = ft.Checkbox(
-            label="Audios", value=False, on_change=self.update_state
+            label=t("Audios"), value=False, on_change=self.update_state
         )
         self.add_post_title_to_filename = ft.Checkbox(
-            label="Add post title to filename", value=False, width=200
+            label=t("Add post title to filename"), value=False, width=200
         )
         self.proceed_button = ft.Button(
-            "Proceed", width=200, height=50, disabled=True, on_click=self.do_merge
+            t("Proceed"), width=200, height=50, disabled=True, on_click=self.do_merge
         )
         self.controls = [
             components.AppBar(manager),
@@ -87,7 +88,7 @@ class MergeAuthorContentPage(ft.View):
                     ft.IconButton(
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
-                    ft.Text("Content merger", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(t("Content merger"), size=24, weight=ft.FontWeight.BOLD),
                 ]
             ),
             ft.Row(
@@ -95,7 +96,9 @@ class MergeAuthorContentPage(ft.View):
                     ft.Column(
                         [
                             ft.Text(
-                                "Transfer content from the author's post folders to one folder"
+                                t(
+                                    "Transfer content from the author's post folders to one folder"
+                                )
                             ),
                             self.action_type,
                             self.authors_dropdown,
@@ -169,7 +172,7 @@ class MergeAuthorContentPage(ft.View):
         if not source_folder.exists() or not destination_folder.exists():
             return
         self.disabled = True
-        self.proceed_button.text = "Working..."
+        self.proceed_button.text = t("Working...")
         self.page.update()
         await asyncio.sleep(2)
         posts = os.listdir(source_folder)
@@ -258,16 +261,23 @@ class MergeAuthorContentPage(ft.View):
                     stats[file_type] += 1
                 except Exception as e:
                     logger.error("Error on moving file", exc_info=e)
-        text_result = "Copied" if action == "copy" else "Moved"
-        text_result += f" {stats['photos']} photos, {stats['videos']} videos, {stats['audios']} audios from {stats['posts']} posts."
+        text_result = t("Copied") if action == "copy" else t("Moved")
+        text_result += t(
+            " {photos} photos, {videos} videos, {audios} audios from {posts} posts."
+        ).format(
+            photos=stats["photos"],
+            videos=stats["videos"],
+            audios=stats["audios"],
+            posts=stats["posts"],
+        )
         self.page.show_dialog(
             ft.AlertDialog(
-                title=ft.Text("Done"),
+                title=ft.Text(t("Done")),
                 content=ft.Text(text_result),
-                actions=[ft.TextButton("Ok", on_click=self.page.pop_dialog)],
+                actions=[ft.TextButton(t("Ok"), on_click=self.page.pop_dialog)],
                 open=True,
             )
         )
         self.disabled = False
-        self.proceed_button.text = "Proceed"
+        self.proceed_button.text = t("Proceed")
         self.page.update()

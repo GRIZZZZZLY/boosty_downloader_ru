@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import Optional, List
 
 import aiofiles
@@ -23,9 +24,14 @@ from core.defs.tasks import TaskError
 from core.draftjs_converter import DraftJsConverter
 from core.logger import setup_logger
 from core.progress_counter import ProgressCounter
+from i18n import t
 from core.utils import validate_windows_dir_name, sign_url, get_download_settings
 
 logger = setup_logger()
+
+# Boosty shows post times in Moscow time, so the saved text matches the site
+# whatever the computer's own clock is set to.
+POST_TIMEZONE = ZoneInfo("Europe/Moscow")
 
 
 @dataclass
@@ -320,22 +326,25 @@ class Task:
 
             try:
                 parser = DraftJsConverter(post_info.text_content.content)
-                post_time = datetime.fromtimestamp(post_info.publish_time)
+                post_time = datetime.fromtimestamp(
+                    post_info.publish_time, POST_TIMEZONE
+                )
                 fmt_date = post_time.strftime("%d.%m.%Y %H:%M")
+                published = t("Published {date}").format(date=fmt_date)
                 if settings.post_text_format == "md":
                     if post_info.title:
                         text_content = f"# {post_info.title}\n"
                     else:
                         text_content = ""
                     text_content += parser.to_markdown() + "\n\n"
-                    text_content += f"---\n\n*Published {fmt_date}*\n"
+                    text_content += f"---\n\n*{published}*\n"
                 else:
                     if post_info.title:
                         text_content = f"{post_info.title} \n\n"
                     else:
                         text_content = ""
                     text_content += parser.to_plain_text() + "\n\n"
-                    text_content += f"[Published {fmt_date}]\n"
+                    text_content += f"[{published}]\n"
             except Exception as e:
                 logger.error(
                     "Failed get post text content due unexpected error", exc_info=e

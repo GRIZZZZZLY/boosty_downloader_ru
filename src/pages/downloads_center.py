@@ -8,6 +8,7 @@ from components.paginator import Paginator
 from components.task_item import TaskItem
 from core.defs.tasks import TaskInfo
 from core.downloads_manager import DownloadManager
+from i18n import t
 
 
 class DownloadsCenterPage(ft.View):
@@ -27,7 +28,7 @@ class DownloadsCenterPage(ft.View):
 
         self.list_view.controls = self.slots
         self.stop_all_button = ft.Button(
-            "Cancel all",
+            t("Cancel all"),
             color=ft.Colors.SURFACE,
             icon=ft.Icons.STOP,
             icon_color=ft.Colors.PRIMARY,
@@ -36,7 +37,7 @@ class DownloadsCenterPage(ft.View):
         )
         self.status_line = ft.ListTile(
             leading=ft.Icon(ft.Icons.DOWNLOADING),
-            title="In progress: 0 / 0",
+            title=t("In progress: {pending} / {total}").format(pending=0, total=0),
             trailing=self.stop_all_button,
         )
 
@@ -53,7 +54,9 @@ class DownloadsCenterPage(ft.View):
                                 ),
                             ),
                             ft.Text(
-                                "Downloads center", size=24, weight=ft.FontWeight.BOLD
+                                t("Downloads center"),
+                                size=24,
+                                weight=ft.FontWeight.BOLD,
                             ),
                         ]
                     ),
@@ -109,7 +112,9 @@ class DownloadsCenterPage(ft.View):
             self.paginator.set_total_items(self.manager.total_tasks)
             pending = await self.manager.get_pending_tasks_count()
             active_total = await self.manager.get_active_tasks_count()
-            self.status_line.title = f"In progress: {pending} / {active_total}"
+            self.status_line.title = t("In progress: {pending} / {total}").format(
+                pending=pending, total=active_total
+            )
             if pending > 0:
                 self.stop_all_button.visible = True
             else:

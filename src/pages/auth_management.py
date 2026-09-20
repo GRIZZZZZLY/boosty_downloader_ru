@@ -10,6 +10,7 @@ import components
 from core.authorization_provider import AuthorizationProvider
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
+from i18n import t
 
 logger = setup_logger()
 
@@ -19,7 +20,7 @@ class AuthManagementPage(ft.View):
         super().__init__()
         self.route = "/auth-management"
         self.copy_script_button = ft.Button(
-            "Copy login script",
+            t("Copy login script"),
             icon=ft.Icon(ft.Icons.COPY, color=ft.Colors.PRIMARY),
             color=ft.Colors.ON_SURFACE,
             height=50,
@@ -42,16 +43,18 @@ class AuthManagementPage(ft.View):
             auto_scroll=True,
             expand=True,
             controls=[
-                ft.Text("1. Copy script", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text("Click the button to copy script:"),
+                ft.Text(t("1. Copy script"), size=20, weight=ft.FontWeight.BOLD),
+                ft.Text(t("Click the button to copy script:")),
                 self.copy_script_button,
                 ft.Text(
-                    "2. Paste script into the browser console on boosty",
+                    t("2. Paste script into the browser console on boosty"),
                     size=20,
                     weight=ft.FontWeight.BOLD,
                 ),
                 ft.Text(
-                    "Press the F12 key when you are on the boosty page, and then paste the text into the console."
+                    t(
+                        "Press the F12 key when you are on the boosty page, and then paste the text into the console."
+                    )
                 ),
                 ft.Container(
                     bgcolor=ft.Colors.SURFACE_CONTAINER,
@@ -62,7 +65,9 @@ class AuthManagementPage(ft.View):
                         controls=[
                             ft.Icon(ft.Icons.INFO, color=ft.Colors.ON_SURFACE),
                             ft.Text(
-                                "Make sure that you are logged in to your account on the website.",
+                                t(
+                                    "Make sure that you are logged in to your account on the website."
+                                ),
                                 width=570,
                                 weight=ft.FontWeight.BOLD,
                             ),
@@ -78,20 +83,24 @@ class AuthManagementPage(ft.View):
                         controls=[
                             ft.Icon(ft.Icons.INFO, color=ft.Colors.ON_SURFACE),
                             ft.Text(
-                                "If the browser shows a warning about code insertion, follow its instructions. Usually you just need to enter 'allow pasting' and press enter.",
+                                t(
+                                    "If the browser shows a warning about code insertion, follow its instructions. Usually you just need to enter 'allow pasting' and press enter."
+                                ),
                                 width=570,
                                 weight=ft.FontWeight.BOLD,
                             ),
                         ]
                     ),
                 ),
-                ft.Text("3. Authorize app", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text(t("3. Authorize app"), size=20, weight=ft.FontWeight.BOLD),
                 ft.Text(
-                    "Copy the token that appeared in the browser console and paste it here:"
+                    t(
+                        "Copy the token that appeared in the browser console and paste it here:"
+                    )
                 ),
                 self.token_text_field,
                 ft.Button(
-                    "Save token",
+                    t("Save token"),
                     icon=ft.Icon(ft.Icons.SAVE, color=ft.Colors.PRIMARY),
                     color=ft.Colors.ON_SURFACE,
                     height=50,
@@ -112,7 +121,7 @@ class AuthManagementPage(ft.View):
                     controls=[
                         ft.Icon(ft.Icons.DONE, color=ft.Colors.PRIMARY, size=30),
                         ft.Text(
-                            "Logged in",
+                            t("Logged in"),
                             size=22,
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.PRIMARY,
@@ -121,7 +130,7 @@ class AuthManagementPage(ft.View):
                 ),
                 self.auth_expires_info,
                 ft.Button(
-                    "Logout",
+                    t("Logout"),
                     width=150,
                     height=50,
                     icon=ft.Icon(ft.Icons.LOGOUT, color=ft.Colors.PRIMARY),
@@ -143,7 +152,9 @@ class AuthManagementPage(ft.View):
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
                     ft.Text(
-                        "Authorization management", size=24, weight=ft.FontWeight.BOLD
+                        t("Authorization management"),
+                        size=24,
+                        weight=ft.FontWeight.BOLD,
                     ),
                 ]
             ),
@@ -156,17 +167,20 @@ class AuthManagementPage(ft.View):
                     delta = expires_in - now
                     days = delta.days
                     hours = delta.seconds // 3600
-                    msg = "Token will valid for "
-                    if days > 0:
-                        msg += f"{days} days, "
                     if hours == 0:
-                        self.auth_expires_info.value = (
-                            msg + f"{delta.seconds // 60} minutes."
+                        tail = t("{minutes} minutes.").format(
+                            minutes=delta.seconds // 60
                         )
                     else:
-                        self.auth_expires_info.value = (
-                            msg + f"{delta.seconds // 3600} hours."
-                        )
+                        tail = t("{hours} hours.").format(hours=hours)
+                    if days > 0:
+                        self.auth_expires_info.value = t(
+                            "Token will valid for {days} days, {tail}"
+                        ).format(days=days, tail=tail)
+                    else:
+                        self.auth_expires_info.value = t(
+                            "Token will valid for {tail}"
+                        ).format(tail=tail)
                     base_view.append(self.deauth_view)
                     self.controls = base_view
                     self.page.update()
@@ -202,11 +216,11 @@ class AuthManagementPage(ft.View):
         if not value:
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Empty token"),
-                    content=ft.Text("Type token from console into the text field"),
+                    title=ft.Text(t("Empty token")),
+                    content=ft.Text(t("Type token from console into the text field")),
                     actions=[
                         ft.TextButton(
-                            "Ops, ok", on_click=lambda e: self.page.pop_dialog()
+                            t("Ops, ok"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -217,11 +231,11 @@ class AuthManagementPage(ft.View):
         if not auth_token:
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Token is incorrect"),
-                    content=ft.Text("Are you sure you copied it completely?"),
+                    title=ft.Text(t("Token is incorrect")),
+                    content=ft.Text(t("Are you sure you copied it completely?")),
                     actions=[
                         ft.TextButton(
-                            "I'll check", on_click=lambda e: self.page.pop_dialog()
+                            t("I'll check"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,

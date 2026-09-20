@@ -5,6 +5,7 @@ import flet as ft
 
 from core.authorization_provider import AuthorizationProvider
 from core.downloads_manager import DownloadManager
+from i18n import t
 
 
 @ft.control
@@ -42,7 +43,7 @@ class AppBar(ft.AppBar):
         self.alive = True
         self.upd_task = asyncio.create_task(self.update_task())
         self.login_button = ft.TextButton(
-            ft.Text("Not logged in", size=18, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text(t("Not logged in"), size=18, color=ft.Colors.ON_SURFACE_VARIANT),
             style=ft.ButtonStyle(
                 overlay_color=ft.Colors.TRANSPARENT,
                 bgcolor=ft.Colors.TRANSPARENT,
@@ -81,7 +82,9 @@ class AppBar(ft.AppBar):
                     self.login_button,
                 ]
                 self.title.tooltip = ft.Tooltip(
-                    message="To download private content available to you, log in the app"
+                    message=t(
+                        "To download private content available to you, log in the app"
+                    )
                 )
             self.update()
             await asyncio.sleep(1)

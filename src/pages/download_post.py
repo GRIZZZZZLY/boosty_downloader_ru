@@ -3,6 +3,7 @@ import flet as ft
 import components
 from core.downloads_manager import DownloadManager
 from core.utils import parse_post_link
+from i18n import t
 
 
 class DownloadPostPage(ft.View):
@@ -29,7 +30,7 @@ class DownloadPostPage(ft.View):
                     ft.IconButton(
                         ft.Icon(ft.Icons.ARROW_BACK), on_click=self.go_to_index
                     ),
-                    ft.Text("Download post", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(t("Download post"), size=24, weight=ft.FontWeight.BOLD),
                 ]
             ),
             ft.Container(
@@ -42,7 +43,7 @@ class DownloadPostPage(ft.View):
                     controls=[
                         self.text_field,
                         ft.Button(
-                            content=ft.Text("Download", size=17),
+                            content=ft.Text(t("Download"), size=17),
                             icon=ft.Icon(
                                 ft.Icons.DOWNLOAD, color=ft.Colors.PRIMARY, size=16
                             ),
@@ -72,11 +73,11 @@ class DownloadPostPage(ft.View):
         if self.text_field.value.strip() == "":
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Empty address"),
-                    content=ft.Text("Type link to post into the text field"),
+                    title=ft.Text(t("Empty address")),
+                    content=ft.Text(t("Type link to post into the text field")),
                     actions=[
                         ft.TextButton(
-                            "Ops, ok", on_click=lambda e: self.page.pop_dialog()
+                            t("Ops, ok"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -87,11 +88,11 @@ class DownloadPostPage(ft.View):
         if not rel_post_link:
             self.page.show_dialog(
                 ft.AlertDialog(
-                    title=ft.Text("Link to post seems invalid"),
-                    content=ft.Text("It looks like you entered an incorrect link"),
+                    title=ft.Text(t("Link to post seems invalid")),
+                    content=ft.Text(t("It looks like you entered an incorrect link")),
                     actions=[
                         ft.TextButton(
-                            "I'll check", on_click=lambda e: self.page.pop_dialog()
+                            t("I'll check"), on_click=lambda e: self.page.pop_dialog()
                         )
                     ],
                     open=True,
@@ -102,6 +103,6 @@ class DownloadPostPage(ft.View):
         self.page.update()
         add_result = await self.manager.add_task(rel_post_link.author, rel_post_link.id)
         if add_result:
-            self.page.show_dialog(ft.SnackBar(ft.Text("Queued")))
+            self.page.show_dialog(ft.SnackBar(ft.Text(t("Queued"))))
         else:
-            self.page.show_dialog(ft.SnackBar(ft.Text("Already in queue")))
+            self.page.show_dialog(ft.SnackBar(ft.Text(t("Already in queue"))))

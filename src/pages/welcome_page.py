@@ -2,6 +2,7 @@ import flet as ft
 
 import components
 from core.downloads_manager import DownloadManager
+from i18n import t
 
 
 class WelcomePage(ft.View):
@@ -41,12 +42,14 @@ class WelcomePage(ft.View):
                                                         spacing=2,
                                                         controls=[
                                                             ft.Text(
-                                                                value="One post",
+                                                                value=t("One post"),
                                                                 size=20,
                                                                 color=ft.Colors.ON_SURFACE_VARIANT,
                                                             ),
                                                             ft.Text(
-                                                                value="download a specific author's post via a direct link",
+                                                                value=t(
+                                                                    "download a specific author's post via a direct link"
+                                                                ),
                                                                 color=ft.Colors.ON_SURFACE_VARIANT,
                                                             ),
                                                         ],
@@ -71,12 +74,16 @@ class WelcomePage(ft.View):
                                                         spacing=2,
                                                         controls=[
                                                             ft.Text(
-                                                                value="Several posts",
+                                                                value=t(
+                                                                    "Several posts"
+                                                                ),
                                                                 size=20,
                                                                 color=ft.Colors.ON_SURFACE_VARIANT,
                                                             ),
                                                             ft.Text(
-                                                                value="download an author's posts over a given time period",
+                                                                value=t(
+                                                                    "download an author's posts over a given time period"
+                                                                ),
                                                                 color=ft.Colors.ON_SURFACE_VARIANT,
                                                             ),
                                                         ],
@@ -94,7 +101,7 @@ class WelcomePage(ft.View):
                                 content=ft.Row(
                                     [
                                         ft.Icon(ft.Icons.MORE_HORIZ),
-                                        ft.Text("More", align=ft.Alignment.CENTER),
+                                        ft.Text(t("More"), align=ft.Alignment.CENTER),
                                     ],
                                     width=80,
                                     alignment=ft.MainAxisAlignment.CENTER,
@@ -106,7 +113,7 @@ class WelcomePage(ft.View):
                                     content=ft.Row(
                                         [
                                             ft.Icon(ft.Icons.BUG_REPORT),
-                                            ft.Text("Give feedback or report a bug"),
+                                            ft.Text(t("Give feedback or report a bug")),
                                         ]
                                     ),
                                     on_click=self.go_to_feedback,
@@ -115,7 +122,7 @@ class WelcomePage(ft.View):
                                     content=ft.Row(
                                         [
                                             ft.Icon(ft.Icons.MERGE),
-                                            ft.Text("Merge author's content"),
+                                            ft.Text(t("Merge author's content")),
                                         ]
                                     ),
                                     on_click=self.go_to_content_merger,
@@ -124,7 +131,7 @@ class WelcomePage(ft.View):
                                     content=ft.Row(
                                         [
                                             ft.Icon(ft.Icons.IMAGE),
-                                            ft.Text("Download image by link"),
+                                            ft.Text(t("Download image by link")),
                                         ]
                                     ),
                                     on_click=self.go_to_media_downloader,

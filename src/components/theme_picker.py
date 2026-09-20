@@ -3,6 +3,8 @@ from enum import Enum
 
 import flet as ft
 
+from i18n import t
+
 
 class ThemeMode(Enum):
     LIGHT = "light"
@@ -16,6 +18,8 @@ theme_icons = {
     ThemeMode.SYSTEM: ft.Icons.BRIGHTNESS_AUTO,
 }
 
+# Source strings; translated at build time, not at import time, so switching
+# the language and rebuilding the page is enough to update them.
 theme_names = {
     ThemeMode.LIGHT: "Light",
     ThemeMode.DARK: "Dark",
@@ -44,31 +48,31 @@ class ThemePicker(ft.Dropdown):
         self.options = [
             ft.dropdown.Option(
                 key=ThemeMode.LIGHT.value,
-                text=theme_names[ThemeMode.LIGHT],
+                text=t(theme_names[ThemeMode.LIGHT]),
                 content=ft.Row(
                     [
                         ft.Icon(theme_icons[ThemeMode.LIGHT], size=20),
-                        ft.Text(theme_names[ThemeMode.LIGHT]),
+                        ft.Text(t(theme_names[ThemeMode.LIGHT])),
                     ]
                 ),
             ),
             ft.dropdown.Option(
                 key=ThemeMode.DARK.value,
-                text=theme_names[ThemeMode.DARK],
+                text=t(theme_names[ThemeMode.DARK]),
                 content=ft.Row(
                     [
                         ft.Icon(theme_icons[ThemeMode.DARK], size=20),
-                        ft.Text(theme_names[ThemeMode.DARK]),
+                        ft.Text(t(theme_names[ThemeMode.DARK])),
                     ]
                 ),
             ),
             ft.dropdown.Option(
                 key=ThemeMode.SYSTEM.value,
-                text=theme_names[ThemeMode.SYSTEM],
+                text=t(theme_names[ThemeMode.SYSTEM]),
                 content=ft.Row(
                     [
                         ft.Icon(theme_icons[ThemeMode.SYSTEM], size=20),
-                        ft.Text(theme_names[ThemeMode.SYSTEM]),
+                        ft.Text(t(theme_names[ThemeMode.SYSTEM])),
                     ]
                 ),
             ),
