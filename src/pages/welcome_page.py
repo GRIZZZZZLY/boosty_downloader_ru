@@ -112,6 +112,15 @@ class WelcomePage(ft.View):
                                 ft.PopupMenuItem(
                                     content=ft.Row(
                                         [
+                                            ft.Icon(ft.Icons.SYNC),
+                                            ft.Text(t("What is new")),
+                                        ]
+                                    ),
+                                    on_click=self.go_to_whats_new,
+                                ),
+                                ft.PopupMenuItem(
+                                    content=ft.Row(
+                                        [
                                             ft.Icon(ft.Icons.BUG_REPORT),
                                             ft.Text(t("Give feedback or report a bug")),
                                         ]
@@ -158,3 +167,6 @@ class WelcomePage(ft.View):
 
     async def go_to_feedback(self):
         await self.page.push_route("/feedback-and-bugs")
+
+    async def go_to_whats_new(self):
+        await self.page.push_route("/whats-new")

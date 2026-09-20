@@ -134,6 +134,20 @@ RU = {
         "Произошла ошибка при поиске постов. Проверьте ссылку или попробуйте позже."
     ),
     "Ok": "Хорошо",
+    # --- what is new -----------------------------------------------------
+    "What is new": "Что нового",
+    "Paste a link to the author's page or the nickname, and the app will compare Boosty with what you already have": (
+        "Вставьте ссылку на страницу автора или его никнейм — приложение "
+        "сравнит Boosty с тем, что уже скачано"
+    ),
+    "Check": "Сверить",
+    "Asking Boosty for the list of posts...": "Спрашиваю у Boosty список постов...",
+    "{count} posts on Boosty": "Постов на Boosty: {count}",
+    "{total} posts on Boosty, {have} already downloaded, {missing} missing": (
+        "На Boosty {total}, уже скачано {have}, не хватает {missing}"
+    ),
+    "({locked} without access)": "(из них без доступа: {locked})",
+    "Download what is missing": "Скачать недостающее",
     # --- download image by link ------------------------------------------
     "Choose download folder": "Выберите папку для загрузки",
     "Paste here link to the image (from feed or direct messages)": (

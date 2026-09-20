@@ -15,6 +15,7 @@ from pages.feedback_and_bugs import FeedbackAndBugsPage
 from pages.merge_author_content import MergeAuthorContentPage
 from pages.settings_page import SettingsPage
 from pages.welcome_page import WelcomePage
+from pages.whats_new import WhatsNewPage
 from themes import LIGHT_THEME, DARK_THEME
 from components.language_picker import load_saved_language
 from i18n import t
@@ -61,6 +62,8 @@ async def main(page: ft.Page):
                 page.views.append(DownloadImageByLinkPage(manager))
             case "/feedback-and-bugs":
                 page.views.append(FeedbackAndBugsPage(manager))
+            case "/whats-new":
+                page.views.append(WhatsNewPage(manager))
 
         page.update()
 

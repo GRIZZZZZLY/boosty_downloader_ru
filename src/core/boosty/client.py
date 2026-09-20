@@ -131,29 +131,36 @@ class BoostyClient:
             signed_query=content["signedQuery"],
         )
 
-        # The text an author writes above an attachment is its name, so it is
-        # carried over to the attachment instead of being dropped.
+        self._fill_post_blocks(result, content["data"])
+        return result
+
+    def _fill_post_blocks(self, post: cdefs.BoostyPostDto, blocks: list) -> None:
+        """Split the post body into text and attachments.
+
+        The text an author writes above an attachment is its name, so it is
+        carried over to the attachment instead of being dropped.
+        """
+        text_content = cdefs.BoostyPostTextDto()
         pending_headings: list[str] = []
 
-        for media in content["data"]:
-            wrapped_media = self._wrap_media_item(media)
-            if not wrapped_media:
+        for block in blocks:
+            wrapped = self._wrap_media_item(block)
+            if not wrapped:
                 continue
             if isinstance(
-                wrapped_media,
+                wrapped,
                 (cdefs.BoostyTextDto, cdefs.BoostyLinkDto, cdefs.BoostyListDto),
             ):
-                text_content.content.append(wrapped_media)
-                if isinstance(wrapped_media, cdefs.BoostyTextDto):
-                    if line := _first_text_line(wrapped_media.content):
+                text_content.content.append(wrapped)
+                if isinstance(wrapped, cdefs.BoostyTextDto):
+                    if line := _first_text_line(wrapped.content):
                         pending_headings.append(line)
                 continue
-            wrapped_media.heading_lines = pending_headings
+            wrapped.heading_lines = pending_headings
             pending_headings = []
-            result.media.append(wrapped_media)
+            post.media.append(wrapped)
 
-        result.text_content = text_content
-        return result
+        post.text_content = text_content
 
     async def get_posts_list(
         self,
@@ -190,18 +197,7 @@ class BoostyClient:
                 publish_time=post["publishTime"],
                 signed_query=post["signedQuery"],
             )
-            text_content = cdefs.BoostyPostTextDto()
-            for media in post["data"]:
-                wrapped_media = self._wrap_media_item(media)
-                if wrapped_media:
-                    if isinstance(
-                        wrapped_media,
-                        (cdefs.BoostyTextDto, cdefs.BoostyLinkDto, cdefs.BoostyListDto),
-                    ):
-                        text_content.content.append(wrapped_media)
-                    else:
-                        new_post.media.append(wrapped_media)
-            new_post.text_content = text_content
+            self._fill_post_blocks(new_post, post["data"])
             result.data.append(new_post)
         return result
 

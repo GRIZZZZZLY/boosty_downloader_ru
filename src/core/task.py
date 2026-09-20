@@ -8,6 +8,7 @@ from typing import Optional, List
 import aiofiles
 from aiohttp import ClientSession
 
+from core.archive_index import record_post
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.boosty.defs import (
@@ -500,6 +501,10 @@ class Task:
                                 return self._fallback(TaskError.ERROR)
                             await asyncio.sleep(RETRY_PAUSE_SECONDS)
                     await asyncio.sleep(0.1)
+
+            # Recorded only once every file is in place, so the index never
+            # claims a post that is half downloaded.
+            await record_post(author_path, self.post_id, post_path.name)
 
             self._done = True
             self._percent = 100
