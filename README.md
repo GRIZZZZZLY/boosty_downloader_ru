@@ -71,6 +71,10 @@ Authorize app to get available for you private content:
 
 ⚠️ **Windows**: The path to this folder must contain only latin characters. Make sure that the folder path does not contain cyrillic or other prohibited characters.
 
+> In this fork that restriction is gone: the Flet 1.0 upgrade fixed it. The
+> original crashes with `ModuleNotFoundError: No module named 'encodings'` when
+> unpacked into a path with cyrillic characters; this fork starts normally.
+
 ⚠️ **macOS**: When attempting to launch the app, you may encounter a warning from the operating system about launching an app from an unknown developer. 
 To open the app anyway, read official instruction (these steps only need to be performed once): https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac
 
