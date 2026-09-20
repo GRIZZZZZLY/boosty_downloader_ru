@@ -24,7 +24,9 @@ class LanguagePicker(ft.Dropdown):
         super().__init__()
         self.height = 50
         self.width = 700
-        self.border_color = ft.Colors.TRANSPARENT
+        self.border = ft.OutlineInputBorder(
+            side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+        )
         self.filled = True
         self.fill_color = ft.Colors.SURFACE_CONTAINER
         self.text_size = 14

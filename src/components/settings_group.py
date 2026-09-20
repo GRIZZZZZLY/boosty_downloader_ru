@@ -38,7 +38,9 @@ class SettingsGroup(ft.ListView):
             width=700,
             value="ultra_hd",
             label=t("Restrict video size"),
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             options=[
@@ -53,7 +55,9 @@ class SettingsGroup(ft.ListView):
             width=700,
             value="md",
             label=t("Post text format"),
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             options=[
@@ -65,7 +69,9 @@ class SettingsGroup(ft.ListView):
             width=700,
             value="archive",
             label=t("Folder and file names"),
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             options=[

@@ -29,7 +29,9 @@ class AuthManagementPage(ft.View):
         self.token_text_field = ft.TextField(
             value="",
             hint_text="eyJhdXRob3JpemF0aW9uIjoiYXV0aCIsImV4cGlyZXNfaW4iOiJleHAiLCJmdWxsX2Nvb2tpZSI6ImNvb2sifQ==",
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             hint_style=ft.TextStyle(color=ft.Colors.GREY_600),

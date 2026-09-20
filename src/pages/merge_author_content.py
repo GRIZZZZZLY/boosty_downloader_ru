@@ -22,7 +22,9 @@ class MergeAuthorContentPage(ft.View):
         self.destination_folder_valid = False
         self.action_type = ft.Dropdown(
             width=500,
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             label=t("Action"),
@@ -35,7 +37,9 @@ class MergeAuthorContentPage(ft.View):
         self.authors_dropdown = ft.Dropdown(
             width=500,
             label=t("Choose author's folder"),
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             on_select=self.update_state,

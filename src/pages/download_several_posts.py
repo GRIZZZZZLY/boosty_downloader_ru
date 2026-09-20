@@ -26,7 +26,9 @@ class DownloadSeveralPostsPage(ft.View):
             hint_text="https://boosty.to/author",
             width=450,
             value="",
-            border_color=ft.Colors.TRANSPARENT,
+            border=ft.OutlineInputBorder(
+                side=ft.BorderSide(color=ft.Colors.TRANSPARENT)
+            ),
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             hint_style=ft.TextStyle(color=ft.Colors.GREY_600),
