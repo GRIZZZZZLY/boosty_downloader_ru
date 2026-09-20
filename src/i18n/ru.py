@@ -22,6 +22,9 @@ RU = {
     "Download image by link": "Скачать изображение по ссылке",
     # --- settings --------------------------------------------------------
     "Settings": "Настройки",
+    "A modified fork of Boosty downloader by {author}": (
+        "Изменённый форк Boosty downloader, автор оригинала — {author}:"
+    ),
     "Fetching...": "Загрузка...",
     "Download folder": "Папка загрузки",
     "App theme": "Тема оформления",

@@ -108,6 +108,28 @@ class SettingsGroup(ft.ListView):
                     ft.TextSpan(f"build v{app_version.BUILD}"),
                 ]
             ),
+            # Required by CC BY-NC 4.0: credit, a link, and a note that this
+            # copy was changed.
+            ft.Text(
+                spans=[
+                    ft.TextSpan(
+                        t("A modified fork of Boosty downloader by {author}").format(
+                            author=app_version.UPSTREAM_AUTHOR
+                        )
+                        + " "
+                    ),
+                    ft.TextSpan(
+                        app_version.UPSTREAM_URL,
+                        ft.TextStyle(
+                            color=ft.Colors.PRIMARY,
+                            decoration=ft.TextDecoration.UNDERLINE,
+                        ),
+                        url=app_version.UPSTREAM_URL,
+                    ),
+                ],
+                theme_style=ft.TextThemeStyle.LABEL_MEDIUM,
+                color=ft.Colors.ON_SURFACE_VARIANT,
+            ),
             ft.Text(t("Download folder"), theme_style=ft.TextThemeStyle.LABEL_MEDIUM),
             ft.Button(
                 style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5)),

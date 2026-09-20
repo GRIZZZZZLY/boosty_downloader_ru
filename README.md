@@ -7,6 +7,22 @@
 
 ---
 
+> **This is a modified fork.** The original is
+> [lowfc/boosty_downloader](https://github.com/lowfc/boosty_downloader) by
+> Rowdy Beaver, distributed under [CC BY-NC 4.0](LICENSE.md); this copy is
+> distributed on the same terms and `LICENSE.md` is unchanged.
+>
+> Changes made here: a Russian interface with a language switch, archive-style
+> folder and file names, resumable downloads with an integrity check after
+> each file, an index of what has been downloaded with a "What is new" screen,
+> a working parallelism setting, and an upgrade to Flet 1.0. The original
+> naming is still available as a setting. See [README-RU.md](README-RU.md) for
+> the full list, in Russian.
+>
+> Report problems with this fork in
+> [its own issues](https://github.com/GRIZZZZZLY/boosty_downloader_ru/issues),
+> not to the original author.
+
 Application for downloading content from boosty.to
 
 ## 👀 Demo
