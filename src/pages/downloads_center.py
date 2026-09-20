@@ -72,6 +72,8 @@ class DownloadsCenterPage(ft.View):
             ft.ListView(
                 expand=True,
                 spacing=20,
+                # Two controls, so building them on demand buys nothing.
+                build_controls_on_demand=False,
                 controls=[
                     self.list_view,
                     self.paginator,

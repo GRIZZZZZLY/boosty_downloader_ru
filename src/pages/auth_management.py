@@ -54,6 +54,9 @@ class AuthManagementPage(ft.View):
             align=ft.Alignment.CENTER,
             auto_scroll=True,
             expand=True,
+            # A fixed set of controls, so there is nothing to gain from
+            # building them one at a time while the page scrolls.
+            build_controls_on_demand=False,
             controls=[
                 ft.Text(
                     t("The simple way: through a browser"),

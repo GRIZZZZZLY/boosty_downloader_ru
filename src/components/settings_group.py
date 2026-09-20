@@ -18,6 +18,10 @@ class SettingsGroup(ft.ListView):
         self.padding = 5
         self.width = 700
         self.disabled = True
+        # A ListView builds its rows only as they come into view, which pays
+        # off for a long list and costs a hitch per row here, where the whole
+        # page is a fixed couple of dozen controls.
+        self.build_controls_on_demand = False
 
         self.current_download_folder_text = ft.Text(
             value=t("Fetching..."), size=20, color=ft.Colors.ON_SURFACE_VARIANT
