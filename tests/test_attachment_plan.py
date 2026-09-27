@@ -231,3 +231,90 @@ def test_two_new_files_with_one_free_name_do_not_collide(tmp_path):
     assert present == {2: kept}
     assert len(set(targets.values())) == len(targets)
     assert "01. Урок.mp4" not in targets.values()
+
+
+# --- bringing old files in line with the post --------------------------------
+
+import json as _json  # noqa: E402
+
+import pytest  # noqa: E402
+
+from core.attachment_plan import apply_renames, plan_renames  # noqa: E402
+
+
+def test_renumbered_lessons_are_renamed_to_the_current_names(tmp_path):
+    old = write(tmp_path, "13. 6 Урок. Подмена объектов.mp4", 339)
+    planned = ["16. 9 Урок. Подмена объектов.mp4"]
+    renames = plan_renames(planned, {0: old}, tmp_path)
+    assert renames == [(old, tmp_path / "16. 9 Урок. Подмена объектов.mp4")]
+
+
+def test_a_file_already_under_its_name_is_left_alone(tmp_path):
+    kept = write(tmp_path, "01. Урок 1.mp4", 10)
+    assert plan_renames(["01. Урок 1.mp4"], {0: kept}, tmp_path) == []
+
+
+def test_a_rename_never_lands_on_a_file_that_is_no_attachment(tmp_path):
+    """The person's own file sits where the renamed lesson would go."""
+    old = write(tmp_path, "01. Старое.mp4", 10)
+    write(tmp_path, "02. Новое.mp4", 99)  # matched nothing: not ours to replace
+    assert plan_renames(["02. Новое.mp4"], {0: old}, tmp_path) == []
+
+
+def test_a_file_in_a_block_subfolder_is_renamed_where_it_is(tmp_path):
+    old = write(tmp_path, "Блок 1/01. Старое.mp4", 10)
+    renames = plan_renames(["03. Новое.mp4"], {0: old}, tmp_path)
+    assert renames == [(old, tmp_path / "Блок 1" / "03. Новое.mp4")]
+
+
+def test_two_files_can_swap_names(tmp_path):
+    a = write(tmp_path, "01. A.mp4", 1)
+    b = write(tmp_path, "02. B.mp4", 2)
+    apply_renames(
+        [(a, tmp_path / "02. B.mp4"), (b, tmp_path / "01. A.mp4")],
+        tmp_path / "log.json",
+    )
+    assert (tmp_path / "02. B.mp4").read_bytes() == b"x"
+    assert (tmp_path / "01. A.mp4").read_bytes() == b"xx"
+
+
+def test_every_rename_is_logged_before_anything_moves(tmp_path):
+    a = write(tmp_path, "01. A.mp4", 1)
+    log = tmp_path / "logs" / "rename.json"
+    apply_renames([(a, tmp_path / "05. A.mp4")], log)
+    entries = _json.loads(log.read_text(encoding="utf-8"))["renamed"]
+    assert entries == [[str(a), str(tmp_path / "05. A.mp4")]]
+
+
+def test_a_failed_rename_puts_every_file_back(tmp_path, monkeypatch):
+    """E.g. a video still open in a player cannot be renamed on Windows."""
+    a = write(tmp_path, "01. A.mp4", 1)
+    b = write(tmp_path, "02. B.mp4", 2)
+    real_rename = Path.rename
+
+    def flaky(self, target):
+        if Path(target).name == "01. A.mp4" and RENAMING in self.name:
+            raise PermissionError("file is in use")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky)
+    with pytest.raises(OSError):
+        apply_renames(
+            [(a, tmp_path / "02. B.mp4"), (b, tmp_path / "01. A.mp4")],
+            tmp_path / "log.json",
+        )
+    monkeypatch.setattr(Path, "rename", real_rename)
+    assert sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".mp4") == [
+        "01. A.mp4",
+        "02. B.mp4",
+    ]
+    assert (tmp_path / "01. A.mp4").read_bytes() == b"x"
+    assert (tmp_path / "02. B.mp4").read_bytes() == b"xx"
+
+
+RENAMING = ".renaming-"
+
+
+def test_a_parked_file_is_not_mistaken_for_an_attachment(tmp_path):
+    write(tmp_path, "01. A.mp4.renaming-0", 5)
+    assert count_new_attachments(["01. A.mp4"], tmp_path) == 1

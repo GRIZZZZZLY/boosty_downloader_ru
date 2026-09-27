@@ -9,6 +9,7 @@ retitle lessons. A file on disk is still the same attachment when its size is
 identical to the byte, whatever it is called now.
 """
 
+import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,15 +30,19 @@ from core.utils import sign_url, validate_windows_dir_name
 
 __all__ = [
     "PlannedAttachment",
+    "apply_renames",
     "count_new_attachments",
     "pick_video_url",
     "plan_attachments",
+    "plan_renames",
     "reconcile_with_disk",
 ]
 
 # Files the app writes next to the attachments; never an attachment themselves.
 SERVICE_NAMES = {"contents.md", "contents.txt", "content.md", "content.txt"}
 SERVICE_SUFFIXES = (".part", ".tmp")
+# A rename in progress parks the file under this marker for a moment.
+RENAMING_MARKER = ".renaming-"
 
 
 @dataclass
@@ -146,6 +151,7 @@ def _attachment_files(folder: Path) -> List[Path]:
             if path.is_file()
             and path.name.lower() not in SERVICE_NAMES
             and not path.name.lower().endswith(SERVICE_SUFFIXES)
+            and RENAMING_MARKER not in path.name
         ]
     except OSError:
         return []
@@ -219,3 +225,70 @@ def reconcile_with_disk(
         assigned.add(name.casefold())
         targets[index] = name
     return present, targets
+
+
+def plan_renames(
+    planned_names: List[str], present: Dict[int, Path], folder: Path
+) -> List[Tuple[Path, Path]]:
+    """Renames that bring files on disk in line with the post as it is now.
+
+    Only files already paired with an attachment are renamed, each within the
+    folder it sits in, so a course kept in 'Блок N' subfolders keeps them. A
+    rename that would land on a file which is no attachment is skipped: that
+    file is the person's, and nothing is ever written over it.
+    """
+    claimed = set(present.values())
+    others = {
+        str(path).casefold()
+        for path in _attachment_files(folder)
+        if path not in claimed
+    }
+    renames = []
+    for index, path in sorted(present.items()):
+        target = path.with_name(planned_names[index])
+        if path.name == target.name or str(target).casefold() in others:
+            continue
+        renames.append((path, target))
+    return renames
+
+
+def apply_renames(renames: List[Tuple[Path, Path]], log_file: Path) -> None:
+    """Rename in two steps, logging first, and roll back if a step fails.
+
+    Two steps because an updated course can swap names between its files: the
+    old lesson 13 becomes 16 while a new lesson takes 13. Parking every file
+    under a temporary name first means no rename meets a file still in place.
+    """
+    if not renames:
+        return
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    log_file.write_text(
+        json.dumps(
+            {"renamed": [[str(source), str(target)] for source, target in renames]},
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+    parked: List[Tuple[Path, Path, Path]] = []
+    moved: List[Tuple[Path, Path]] = []
+    try:
+        for number, (source, target) in enumerate(renames):
+            temporary = source.with_name(f"{source.name}{RENAMING_MARKER}{number}")
+            source.rename(temporary)
+            parked.append((source, temporary, target))
+        for source, temporary, target in parked:
+            if target.exists():
+                raise FileExistsError(target)
+            temporary.rename(target)
+            moved.append((source, target))
+    except OSError:
+        # Put every file back where it was, then let the caller report it.
+        # Newest first: a later move may have taken an earlier file's name.
+        done = {source for source, _target in moved}
+        for source, target in reversed(moved):
+            target.rename(source)
+        for source, temporary, _target in parked:
+            if source not in done and temporary.exists():
+                temporary.rename(source)
+        raise

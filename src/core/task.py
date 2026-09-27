@@ -14,7 +14,12 @@ from core.archive_index import (
     record_post,
     resolve_author_folder,
 )
-from core.attachment_plan import plan_attachments, reconcile_with_disk
+from core.attachment_plan import (
+    apply_renames,
+    plan_attachments,
+    plan_renames,
+    reconcile_with_disk,
+)
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.boosty.defs import BoostyPostDto
@@ -29,6 +34,14 @@ from i18n import t
 from core.utils import validate_windows_dir_name, get_download_settings
 
 logger = setup_logger()
+
+# Renames of files already in the archive are logged here, outside the
+# archive, so they can be undone without adding files to the post folders.
+RENAME_LOG_DIR = (
+    Path(os.environ.get("APPDATA") or Path.home())
+    / "boosty_downloader_ru"
+    / "rename_log"
+)
 
 
 @dataclass
@@ -251,9 +264,23 @@ class Task:
         # A post that was downloaded before and has changed since keeps what is
         # already on disk, even under an older name; only new attachments are
         # fetched, and never on top of an existing file.
-        present, targets = reconcile_with_disk(
-            [(item.file_name, size) for item, size in zip(planned, sizes)], post_path
-        )
+        wanted = [(item.file_name, size) for item, size in zip(planned, sizes)]
+        present, targets = reconcile_with_disk(wanted, post_path)
+
+        # The author may have renumbered or retitled lessons since: rename the
+        # files already here to match, so the folder reads in lesson order.
+        renames = plan_renames([item.file_name for item in planned], present, post_path)
+        if renames:
+            log_file = RENAME_LOG_DIR / (
+                f"{datetime.now():%Y-%m-%d_%H%M%S}_{self.post_id}.json"
+            )
+            try:
+                apply_renames(renames, log_file)
+                logger.info(f"Renamed {len(renames)} files, undo log: {log_file}")
+                present, targets = reconcile_with_disk(wanted, post_path)
+            except OSError as e:
+                # Every file is back where it was; download under safe names.
+                logger.error("Could not rename files, keeping old names", exc_info=e)
         if present:
             logger.info(f"{len(present)} of {len(planned)} attachments already on disk")
 
