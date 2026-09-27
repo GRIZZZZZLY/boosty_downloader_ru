@@ -1,13 +1,21 @@
 import json
+import ssl
 from typing import Optional, Union
 
-from aiohttp import ClientSession, ClientTimeout
+import certifi
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 import core.boosty.defs as cdefs
 from core.defs.common import AuthToken
 from core.logger import setup_logger
 
 logger = setup_logger()
+
+# Certificates are checked against certifi's list, not the system store that
+# Python's default context reads. On Windows that store can lack the issuer of
+# the video CDN (okcdn.ru), and every video download then fails the handshake
+# while api.boosty.to still works.
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 def _first_text_line(content: str) -> str:
@@ -50,6 +58,7 @@ class BoostyClient:
         return ClientSession(
             headers=self._get_headers(),
             timeout=ClientTimeout(total=self.download_timeout),
+            connector=TCPConnector(ssl=_SSL_CONTEXT),
         )
 
     def _wrap_media_item(self, media: dict) -> Union[
