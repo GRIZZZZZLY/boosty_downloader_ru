@@ -168,6 +168,12 @@ RU = {
     "Download selected ({count})": "Скачать выбранное ({count})",
     "Posts with new attachments: {count}": "Постов с новыми вложениями: {count}",
     "new attachments: {count}": "новых вложений: {count}",
+    "Checking what changed in updated posts...": (
+        "Проверяю, что изменилось в обновлённых постах..."
+    ),
+    "Files already downloaded that get the author's new numbers: {count}": (
+        "Уже скачанных файлов получат новые номера автора: {count}"
+    ),
     "Select all": "Выбрать все",
     "Select none": "Снять все",
     "Author's archive: {folder}": "Архив автора: {folder}",

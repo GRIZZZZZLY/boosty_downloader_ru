@@ -318,3 +318,50 @@ RENAMING = ".renaming-"
 def test_a_parked_file_is_not_mistaken_for_an_attachment(tmp_path):
     write(tmp_path, "01. A.mp4.renaming-0", 5)
     assert count_new_attachments(["01. A.mp4"], tmp_path) == 1
+
+
+# --- previewing an update ------------------------------------------------------
+
+import asyncio as _asyncio  # noqa: E402
+
+from core.attachment_plan import (  # noqa: E402
+    PlannedAttachment,
+    describe_update,
+    resolve_sizes,
+)
+
+
+def test_sizes_come_from_the_server_only_for_videos():
+    asked = []
+
+    async def fetch(url):
+        asked.append(url)
+        return 500
+
+    planned = [
+        PlannedAttachment("photo", "01. a.jpg", "https://img", 10),
+        PlannedAttachment("video", "01. b.mp4", "https://vid", None),
+    ]
+    assert _asyncio.run(resolve_sizes(planned, fetch)) == [10, 500]
+    assert asked == ["https://vid"]
+
+
+def test_the_preview_names_the_new_files_and_counts_the_renames(tmp_path):
+    write(tmp_path, "01. Урок 1.mp4", 101)
+    write(tmp_path, "12. Старое название.mp4", 170)
+    planned = [
+        PlannedAttachment("video", "01. Урок 1.mp4", "u1", None),
+        PlannedAttachment("video", "12. Блокинг первой сцены.mp4", "u2", None),
+        PlannedAttachment("video", "15. Блокинг четвертой сцены.mp4", "u3", None),
+    ]
+    new_names, renamed = describe_update(planned, [101, 999, 170], tmp_path)
+    assert new_names == ["12. Блокинг первой сцены.mp4"]
+    assert renamed == 1
+
+
+def test_the_preview_changes_nothing_on_disk(tmp_path):
+    write(tmp_path, "12. Старое название.mp4", 170)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    planned = [PlannedAttachment("video", "15. Новое.mp4", "u", None)]
+    describe_update(planned, [170], tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == before

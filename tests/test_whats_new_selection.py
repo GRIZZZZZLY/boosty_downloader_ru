@@ -93,9 +93,20 @@ def test_each_row_shows_the_date_and_falls_back_to_the_id():
 def test_select_buttons_are_hidden_for_a_single_post():
     def check(page):
         page._fill_missing(POSTS[:1])
-        assert not page.selection_row.visible
+        assert not any(button.visible for button in page.select_buttons)
         page._fill_missing(POSTS)
+        assert all(button.visible for button in page.select_buttons)
+
+    with_page(check)
+
+
+def test_the_download_button_shows_even_for_a_single_post():
+    """It shares a row with the select buttons, above the list."""
+
+    def check(page):
+        page._fill_missing(POSTS[:1])
         assert page.selection_row.visible
+        assert page.download_button in page.selection_row.controls
 
     with_page(check)
 
@@ -104,7 +115,7 @@ def test_an_empty_list_hides_the_controls():
     def check(page):
         page._fill_missing([])
         assert not page.missing_list.visible
-        assert not page.download_button.visible
+        assert not page.selection_row.visible
 
     with_page(check)
 
@@ -115,5 +126,23 @@ def test_an_updated_post_says_how_many_attachments_are_new():
         page._fill_missing(page.missing)
         assert page.selection["a"].label.endswith("— новых вложений: 9")
         assert "новых" not in page.selection["b"].label
+
+    with_page(check)
+
+
+def test_an_updated_post_lists_its_new_files_and_the_renames():
+    def check(page):
+        page.new_attachments = {"a": 2}
+        page.update_details = {"a": (["12. Урок 5.mp4", "13. Урок 6.mp4"], 6)}
+        page._fill_missing(page.missing)
+        row = page.missing_list.controls[0]
+        texts = [c.value for c in row.controls[1].content.controls]
+        assert texts == [
+            "+ 12. Урок 5.mp4",
+            "+ 13. Урок 6.mp4",
+            "Уже скачанных файлов получат новые номера автора: 6",
+        ]
+        # A plain new post stays a bare checkbox.
+        assert page.missing_list.controls[1] is page.selection["b"]
 
     with_page(check)

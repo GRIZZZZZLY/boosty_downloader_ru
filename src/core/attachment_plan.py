@@ -13,7 +13,7 @@ import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from core.boosty.defs import (
     BoostyAudioDto,
@@ -32,10 +32,12 @@ __all__ = [
     "PlannedAttachment",
     "apply_renames",
     "count_new_attachments",
+    "describe_update",
     "pick_video_url",
     "plan_attachments",
     "plan_renames",
     "reconcile_with_disk",
+    "resolve_sizes",
 ]
 
 # Files the app writes next to the attachments; never an attachment themselves.
@@ -292,3 +294,31 @@ def apply_renames(renames: List[Tuple[Path, Path]], log_file: Path) -> None:
             if source not in done and temporary.exists():
                 temporary.rename(source)
         raise
+
+
+async def resolve_sizes(
+    planned: List[PlannedAttachment], fetch_size: Callable[[str], Awaitable[int]]
+) -> List[Optional[int]]:
+    """Every attachment's size; videos ask the server, the rest are known."""
+    sizes = []
+    for item in planned:
+        size = item.expected_size
+        if item.kind == "video":
+            size = await fetch_size(item.url)
+        sizes.append(size)
+    return sizes
+
+
+def describe_update(
+    planned: List[PlannedAttachment], sizes: List[Optional[int]], folder: Path
+) -> Tuple[List[str], int]:
+    """What updating a downloaded post would do, without touching the disk.
+
+    Returns the names of the attachments it would download, in post order, and
+    how many files already there would be renamed to the author's current
+    names. The same matching the download uses, so the preview is what happens.
+    """
+    wanted = [(item.file_name, size) for item, size in zip(planned, sizes)]
+    present, targets = reconcile_with_disk(wanted, folder)
+    renames = plan_renames([item.file_name for item in planned], present, folder)
+    return [planned[index].file_name for index in sorted(targets)], len(renames)

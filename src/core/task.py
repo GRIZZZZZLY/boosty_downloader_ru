@@ -19,6 +19,7 @@ from core.attachment_plan import (
     plan_attachments,
     plan_renames,
     reconcile_with_disk,
+    resolve_sizes,
 )
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
@@ -252,14 +253,14 @@ class Task:
         settings: DownloadingSettingsDto,
     ) -> List[FinalDownloadTaskDto]:
         planned = plan_attachments(post_info, settings)
-        sizes = []
-        for item in planned:
-            size = item.expected_size
-            if item.kind == "video":
-                size = await self.fetch_file_size(item.url)
-                if not size:
-                    raise ValueError(f"Failed fetch file size for {item.url}")
-            sizes.append(size)
+
+        async def video_size(url: str) -> int:
+            size = await self.fetch_file_size(url)
+            if not size:
+                raise ValueError(f"Failed fetch file size for {url}")
+            return size
+
+        sizes = await resolve_sizes(planned, video_size)
 
         # A post that was downloaded before and has changed since keeps what is
         # already on disk, even under an older name; only new attachments are

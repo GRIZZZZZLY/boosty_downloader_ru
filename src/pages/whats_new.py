@@ -16,7 +16,12 @@ from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
-from core.attachment_plan import count_new_attachments, plan_attachments
+from core.attachment_plan import (
+    count_new_attachments,
+    describe_update,
+    plan_attachments,
+    resolve_sizes,
+)
 from core.naming import POST_TIMEZONE
 from core.utils import get_download_settings, parse_author_link
 from i18n import t
@@ -76,31 +81,41 @@ class WhatsNewPage(ft.View):
         self.progress = ft.ProgressBar(
             color=ft.Colors.ORANGE, width=500, value=None, visible=False
         )
-        self.missing_list = ft.ListView(height=260, spacing=0, visible=False)
-        self.selection_row = ft.Row(
-            alignment=ft.MainAxisAlignment.CENTER,
-            visible=False,
-            controls=[
-                ft.TextButton(
-                    t("Select all"),
-                    icon=ft.Icons.CHECK_BOX,
-                    on_click=lambda e: self._select_all(True),
-                ),
-                ft.TextButton(
-                    t("Select none"),
-                    icon=ft.Icons.CHECK_BOX_OUTLINE_BLANK,
-                    on_click=lambda e: self._select_all(False),
-                ),
-            ],
+        # Takes whatever height is left and scrolls on its own, so the controls
+        # above it stay on screen however long the list gets.
+        self.missing_list = ft.ListView(
+            expand=True, spacing=6, width=900, visible=False
         )
+        self.select_buttons = [
+            ft.TextButton(
+                t("Select all"),
+                icon=ft.Icons.CHECK_BOX,
+                on_click=lambda e: self._select_all(True),
+            ),
+            ft.TextButton(
+                t("Select none"),
+                icon=ft.Icons.CHECK_BOX_OUTLINE_BLANK,
+                on_click=lambda e: self._select_all(False),
+            ),
+        ]
         self.download_label = ft.Text("", size=17)
         self.download_button = ft.Button(
             content=self.download_label,
             icon=ft.Icon(ft.Icons.DOWNLOAD, color=ft.Colors.PRIMARY, size=16),
-            height=50,
-            visible=False,
+            height=46,
             on_click=self.download_missing,
         )
+        # The download button sits above the list, not below it: below, a long
+        # list pushed it off the bottom of the window.
+        self.selection_row = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            visible=False,
+            spacing=12,
+            controls=[*self.select_buttons, self.download_button],
+        )
+        # Post id -> (names of the new attachments, files that get renumbered).
+        self.update_details: dict[str, tuple[list[str], int]] = {}
 
         self.controls = [
             components.AppBar(manager),
@@ -139,12 +154,11 @@ class WhatsNewPage(ft.View):
                             self.hint_text,
                             self.selection_row,
                             self.missing_list,
-                            self.download_button,
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         alignment=ft.MainAxisAlignment.CENTER,
                         expand=True,
-                        spacing=16,
+                        spacing=12,
                     )
                 ],
                 expand=True,
@@ -187,6 +201,7 @@ class WhatsNewPage(ft.View):
         self.author_name = author_name
         self.missing = []
         self.new_attachments = {}
+        self.update_details = {}
         self._fill_missing([])
         self.hint_text.visible = False
         self.status_text.value = t("Asking Boosty for the list of posts...")
@@ -240,9 +255,12 @@ class WhatsNewPage(ft.View):
         locked = len(missing_ids) - len(new_posts)
 
         # Posts already downloaded can grow: authors add lessons to a course.
-        self.new_attachments = self._count_updates(
-            remote_posts, locate_post_folders(index, folder, remote_posts), settings
-        )
+        folders = locate_post_folders(index, folder, remote_posts)
+        self.new_attachments = self._count_updates(remote_posts, folders, settings)
+        if self.new_attachments:
+            self.status_text.value = t("Checking what changed in updated posts...")
+            self.page.update()
+            await self._describe_updates(client, by_id, folders, settings)
         wanted = set(post.id for post in new_posts) | set(self.new_attachments)
         # Boosty's own order, newest first, for new and updated posts alike.
         self.missing = [post for post in remote_posts if post.id in wanted]
@@ -287,6 +305,71 @@ class WhatsNewPage(ft.View):
                 updates[post.id] = new
         return updates
 
+    async def _describe_updates(self, client, by_id, folders, settings) -> None:
+        """Name the new attachments of each updated post.
+
+        Counting per file type finds that a post changed; naming what changed
+        takes the size of every video, which the server reports on request.
+        This runs only for posts already flagged, and a post whose sizes
+        cannot be fetched keeps its count without the names.
+        """
+        self.update_details = {}
+        async with client.get_client_session() as session:
+
+            async def head_size(url: str) -> int:
+                async with session.head(url) as response:
+                    response.raise_for_status()
+                    return response.content_length
+
+            for post_id in list(self.new_attachments):
+                planned = plan_attachments(by_id[post_id], settings)
+                try:
+                    sizes = await resolve_sizes(planned, head_size)
+                except Exception as e:
+                    logger.error(
+                        f"Could not size the attachments of {post_id}", exc_info=e
+                    )
+                    continue
+                new_names, renamed = describe_update(planned, sizes, folders[post_id])
+                if not new_names:
+                    # The per-type count was fooled; nothing is actually new.
+                    del self.new_attachments[post_id]
+                    continue
+                self.new_attachments[post_id] = len(new_names)
+                self.update_details[post_id] = (new_names, renamed)
+
+    def _post_row(self, post, checkbox: ft.Checkbox) -> ft.Control:
+        """The checkbox, and for an updated post the files it would bring."""
+        details = self.update_details.get(post.id)
+        if not details:
+            return checkbox
+        new_names, renamed = details
+        lines = [
+            ft.Text(f"+ {name}", size=12, color=ft.Colors.ON_SURFACE_VARIANT)
+            for name in new_names
+        ]
+        if renamed:
+            lines.append(
+                ft.Text(
+                    t(
+                        "Files already downloaded that get the author's new numbers: {count}"
+                    ).format(count=renamed),
+                    size=12,
+                    italic=True,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
+                )
+            )
+        return ft.Column(
+            spacing=2,
+            controls=[
+                checkbox,
+                ft.Container(
+                    padding=ft.Padding.only(left=44),
+                    content=ft.Column(spacing=1, controls=lines),
+                ),
+            ],
+        )
+
     def _post_label(self, post) -> str:
         """Date first: titles like '2 Часть' are ambiguous without it."""
         date = datetime.fromtimestamp(post.publish_time, POST_TIMEZONE)
@@ -305,10 +388,15 @@ class WhatsNewPage(ft.View):
             )
             for post in posts
         }
-        self.missing_list.controls = list(self.selection.values())
+        self.missing_list.controls = [
+            self._post_row(post, self.selection[post.id]) for post in posts
+        ]
         self.missing_list.visible = bool(posts)
-        self.selection_row.visible = len(posts) > 1
-        self.download_button.visible = bool(posts)
+        # The download button lives in this row, so the row shows whenever
+        # there is anything to download; only the select buttons need two.
+        self.selection_row.visible = bool(posts)
+        for button in self.select_buttons:
+            button.visible = len(posts) > 1
         self._refresh_download_button(update=False)
 
     def _chosen(self) -> list:
