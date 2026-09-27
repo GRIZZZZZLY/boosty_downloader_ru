@@ -25,6 +25,7 @@ __all__ = [
     "INDEX_FILE_NAME",
     "author_folder",
     "downloaded_post_ids",
+    "locate_post_folders",
     "load_index",
     "missing_post_ids",
     "record_post",
@@ -107,27 +108,46 @@ async def record_post(folder: Path, post_id: str, folder_name: str) -> None:
         logger.error(f"Failed to update the index in {folder}", exc_info=e)
 
 
-def downloaded_post_ids(index: Dict[str, str], folder: Path, posts: list) -> Set[str]:
-    """Posts already on disk: listed in the index, or with their folder present.
+def locate_post_folders(
+    index: Dict[str, str], folder: Path, posts: list
+) -> Dict[str, Path]:
+    """Post id to the folder that holds it, for posts that have one on disk.
 
-    The index is only written by this app. The folder check covers an archive
-    built before the index existed or by other tools, in either naming layout:
+    The index wins, so a post keeps its folder after the author retitles it.
+    Otherwise the folder is recognised by name, in either naming layout:
     `YYYY-MM-DD - Title` for the archive layout, and `Title_id` or a bare `id`
-    for the original one.
+    for the original one, which covers an archive built by other tools.
     """
-    have = set(index)
     try:
         names = {entry.name for entry in folder.iterdir() if entry.is_dir()}
     except OSError:
-        return have
-    trailing_ids = {name.rsplit("_", 1)[-1] for name in names if "_" in name}
+        return {}
+    by_trailing_id = {
+        name.rsplit("_", 1)[-1]: name for name in sorted(names) if "_" in name
+    }
+    found: Dict[str, Path] = {}
     for post in posts:
-        if post.id in have:
-            continue
+        recorded = index.get(post.id)
         archive_name = post_folder_name(post.title or "", post.publish_time, post.id)
-        if archive_name in names or post.id in names or post.id in trailing_ids:
-            have.add(post.id)
-    return have
+        for candidate in (
+            recorded,
+            archive_name,
+            post.id,
+            by_trailing_id.get(post.id),
+        ):
+            if candidate and candidate in names:
+                found[post.id] = folder / candidate
+                break
+    return found
+
+
+def downloaded_post_ids(index: Dict[str, str], folder: Path, posts: list) -> Set[str]:
+    """Posts already on disk: listed in the index, or with their folder present.
+
+    An index entry counts even when its folder is gone, so a post the person
+    deleted on purpose is not offered for download again.
+    """
+    return set(index) | set(locate_post_folders(index, folder, posts))
 
 
 def missing_post_ids(have: Iterable[str], remote_ids: Iterable[str]) -> List[str]:

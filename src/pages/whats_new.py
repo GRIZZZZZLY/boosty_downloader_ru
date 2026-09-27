@@ -6,6 +6,7 @@ import flet as ft
 import components
 from core.archive_index import (
     downloaded_post_ids,
+    locate_post_folders,
     load_index,
     missing_post_ids,
     remember_author_folder,
@@ -15,6 +16,7 @@ from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
+from core.attachment_plan import count_new_attachments, plan_attachments
 from core.naming import POST_TIMEZONE
 from core.utils import get_download_settings, parse_author_link
 from i18n import t
@@ -35,6 +37,8 @@ class WhatsNewPage(ft.View):
         self.missing = []
         # One checkbox per missing post, so the person picks what to download.
         self.selection: dict[str, ft.Checkbox] = {}
+        # Downloaded posts the author has added attachments to since.
+        self.new_attachments: dict[str, int] = {}
         self.author_name = ""
 
         self.text_field = ft.TextField(
@@ -182,6 +186,7 @@ class WhatsNewPage(ft.View):
 
         self.author_name = author_name
         self.missing = []
+        self.new_attachments = {}
         self._fill_missing([])
         self.hint_text.visible = False
         self.status_text.value = t("Asking Boosty for the list of posts...")
@@ -229,10 +234,18 @@ class WhatsNewPage(ft.View):
         by_id = {post.id: post for post in remote_posts}
         have = downloaded_post_ids(index, folder, remote_posts)
         missing_ids = missing_post_ids(have, by_id.keys())
-        self.missing = [
+        new_posts = [
             by_id[post_id] for post_id in missing_ids if by_id[post_id].has_access
         ]
-        locked = len(missing_ids) - len(self.missing)
+        locked = len(missing_ids) - len(new_posts)
+
+        # Posts already downloaded can grow: authors add lessons to a course.
+        self.new_attachments = self._count_updates(
+            remote_posts, locate_post_folders(index, folder, remote_posts), settings
+        )
+        wanted = set(post.id for post in new_posts) | set(self.new_attachments)
+        # Boosty's own order, newest first, for new and updated posts alike.
+        self.missing = [post for post in remote_posts if post.id in wanted]
 
         self.status_text.value = t(
             "{total} posts on Boosty, {have} already downloaded, {missing} missing"
@@ -245,6 +258,10 @@ class WhatsNewPage(ft.View):
             self.status_text.value += " " + t("({locked} without access)").format(
                 locked=locked
             )
+        if self.new_attachments:
+            self.status_text.value += ". " + t(
+                "Posts with new attachments: {count}"
+            ).format(count=len(self.new_attachments))
         # A silent zero looks like a fact; say where the app looked instead.
         if remote_posts and len(missing_ids) == len(remote_posts):
             self.hint_text.value = t(
@@ -258,10 +275,25 @@ class WhatsNewPage(ft.View):
         self._set_busy(False)
 
     @staticmethod
-    def _post_label(post) -> str:
+    def _count_updates(posts, folders: dict, settings) -> dict:
+        """Post id to the number of attachments its folder is missing."""
+        updates = {}
+        for post in posts:
+            folder = folders.get(post.id)
+            if not folder or not post.has_access:
+                continue
+            names = [item.file_name for item in plan_attachments(post, settings)]
+            if new := count_new_attachments(names, folder):
+                updates[post.id] = new
+        return updates
+
+    def _post_label(self, post) -> str:
         """Date first: titles like '2 Часть' are ambiguous without it."""
         date = datetime.fromtimestamp(post.publish_time, POST_TIMEZONE)
-        return f"{date:%d.%m.%Y}  {post.title or post.id}"
+        label = f"{date:%d.%m.%Y}  {post.title or post.id}"
+        if new := self.new_attachments.get(post.id):
+            label += "  — " + t("new attachments: {count}").format(count=new)
+        return label
 
     def _fill_missing(self, posts) -> None:
         """One checkbox per missing post, all ticked, as before the choice existed."""

@@ -8,32 +8,25 @@ from typing import Optional, List
 import aiofiles
 from aiohttp import ClientSession
 
-from core.archive_index import record_post, resolve_author_folder
+from core.archive_index import (
+    load_index,
+    locate_post_folders,
+    record_post,
+    resolve_author_folder,
+)
+from core.attachment_plan import plan_attachments, reconcile_with_disk
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
-from core.boosty.defs import (
-    BoostyImageDto,
-    BoostyAudioDto,
-    BoostyFileDto,
-    BoostyVideoDto,
-    VIDEO_QUALITY_GRADE,
-    BoostyPostDto,
-)
+from core.boosty.defs import BoostyPostDto
 from core.defs.common import DownloadingSettingsDto
 from core.defs.tasks import TaskError
 from core.draftjs_converter import DraftJsConverter
 from core.logger import setup_logger
-from core.naming import (
-    POST_TIMEZONE,
-    media_file_name,
-    post_folder_name,
-    sanitize,
-    unique_file_name,
-)
+from core.naming import POST_TIMEZONE, post_folder_name
 from core.progress_counter import ProgressCounter
 from core.verify import verify_download
 from i18n import t
-from core.utils import validate_windows_dir_name, sign_url, get_download_settings
+from core.utils import validate_windows_dir_name, get_download_settings
 
 logger = setup_logger()
 
@@ -245,119 +238,37 @@ class Task:
         post_info: BoostyPostDto,
         settings: DownloadingSettingsDto,
     ) -> List[FinalDownloadTaskDto]:
+        planned = plan_attachments(post_info, settings)
+        sizes = []
+        for item in planned:
+            size = item.expected_size
+            if item.kind == "video":
+                size = await self.fetch_file_size(item.url)
+                if not size:
+                    raise ValueError(f"Failed fetch file size for {item.url}")
+            sizes.append(size)
+
+        # A post that was downloaded before and has changed since keeps what is
+        # already on disk, even under an older name; only new attachments are
+        # fetched, and never on top of an existing file.
+        present, targets = reconcile_with_disk(
+            [(item.file_name, size) for item, size in zip(planned, sizes)], post_path
+        )
+        if present:
+            logger.info(f"{len(present)} of {len(planned)} attachments already on disk")
+
         download_items = []
-        archive = settings.layout == "archive"
-        post_title = post_info.title or ""
-        # Each attachment type is numbered on its own, so the photos in a post
-        # read 01, 02 … regardless of how many videos sit between them.
-        counters = {"photo": 0, "video": 0, "audio": 0, "file": 0}
-        # The post text is written before the attachments, so its name is
-        # already taken.
-        used_names: set[str] = {"contents.md", "contents.txt"} if archive else set()
-
-        def archive_name(kind: str, media_item, fallback: str, extension: str) -> str:
-            counters[kind] += 1
-            return unique_file_name(
-                media_file_name(
-                    counters[kind],
-                    media_item.heading_lines,
-                    fallback_title=fallback,
-                    post_title=post_title,
-                    extension=extension,
-                ),
-                used_names,
+        for index, (item, size) in enumerate(zip(planned, sizes)):
+            if index in present:
+                continue
+            self._total_weight += size or 0
+            download_items.append(
+                FinalDownloadTaskDto(
+                    final_url=item.url,
+                    save_path=post_path / targets[index],
+                    expected_size=size,
+                )
             )
-
-        for media in post_info.media:
-            if (
-                isinstance(media, BoostyImageDto) and settings.need_download_photos
-            ):  # photo
-                self._total_weight += media.size
-                if archive:
-                    file_name = archive_name("photo", media, "", ".jpg")
-                else:
-                    file_name = media.id + ".jpg"
-                download_items.append(
-                    FinalDownloadTaskDto(
-                        final_url=media.url,
-                        save_path=post_path / file_name,
-                        expected_size=media.size,
-                    )
-                )
-
-            elif (
-                isinstance(media, BoostyVideoDto) and settings.need_download_videos
-            ):  # video
-                lborder_quality = VIDEO_QUALITY_GRADE.index(
-                    settings.preferred_video_size
-                )
-                for i in range(lborder_quality, len(VIDEO_QUALITY_GRADE)):
-                    url_info = media.player_urls.get(VIDEO_QUALITY_GRADE[i])
-                    if url_info:
-                        file_size = await self.fetch_file_size(url_info.url)
-                        if not file_size:
-                            raise ValueError(
-                                f"Failed fetch file size for {url_info.url}"
-                            )
-                        self._total_weight += file_size
-                        if archive:
-                            file_name = archive_name(
-                                "video", media, media.title or "", ".mp4"
-                            )
-                        else:
-                            file_name = validate_windows_dir_name(media.get_title())
-                        download_items.append(
-                            FinalDownloadTaskDto(
-                                final_url=url_info.url,
-                                save_path=post_path / file_name,
-                                expected_size=file_size,
-                            )
-                        )
-                        break
-
-            elif (
-                isinstance(media, BoostyAudioDto) and settings.need_download_audios
-            ):  # audio
-                if post_info.signed_query:
-                    self._total_weight += media.size
-                    if archive:
-                        counters["audio"] += 1
-                        file_name = unique_file_name(
-                            sanitize(media.title)
-                            or f"audio{counters['audio']:02d}.mp3",
-                            used_names,
-                        )
-                    else:
-                        file_name = validate_windows_dir_name(media.get_title())
-                    download_items.append(
-                        FinalDownloadTaskDto(
-                            final_url=sign_url(media.url, post_info.signed_query),
-                            save_path=post_path / file_name,
-                            expected_size=media.size,
-                        )
-                    )
-
-            elif (
-                isinstance(media, BoostyFileDto) and settings.need_download_files
-            ):  # file
-                if post_info.signed_query:
-                    self._total_weight += media.size
-                    if archive:
-                        counters["file"] += 1
-                        file_name = unique_file_name(
-                            sanitize(media.title) or f"file{counters['file']:02d}",
-                            used_names,
-                        )
-                    else:
-                        file_name = validate_windows_dir_name(media.title)
-                    download_items.append(
-                        FinalDownloadTaskDto(
-                            final_url=sign_url(media.url, post_info.signed_query),
-                            save_path=post_path / file_name,
-                            expected_size=media.size,
-                        )
-                    )
-
         return download_items
 
     async def _run(self):
@@ -415,7 +326,14 @@ class Task:
             author_path = await resolve_author_folder(
                 settings.downloads_folder, self.author
             )
-            if settings.layout == "archive":
+            # A post downloaded before goes back into its own folder, even if
+            # the author has retitled it since.
+            existing = locate_post_folders(
+                await load_index(author_path), author_path, [post_info]
+            ).get(self.post_id)
+            if existing:
+                post_path = existing
+            elif settings.layout == "archive":
                 post_path = author_path / post_folder_name(
                     post_info.title or "", post_info.publish_time, self.post_id
                 )

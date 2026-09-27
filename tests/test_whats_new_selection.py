@@ -107,3 +107,13 @@ def test_an_empty_list_hides_the_controls():
         assert not page.download_button.visible
 
     with_page(check)
+
+
+def test_an_updated_post_says_how_many_attachments_are_new():
+    def check(page):
+        page.new_attachments = {"a": 9}
+        page._fill_missing(page.missing)
+        assert page.selection["a"].label.endswith("— новых вложений: 9")
+        assert "новых" not in page.selection["b"].label
+
+    with_page(check)

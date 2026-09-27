@@ -166,6 +166,8 @@ RU = {
     ),
     "({locked} without access)": "(из них без доступа: {locked})",
     "Download selected ({count})": "Скачать выбранное ({count})",
+    "Posts with new attachments: {count}": "Постов с новыми вложениями: {count}",
+    "new attachments: {count}": "новых вложений: {count}",
     "Select all": "Выбрать все",
     "Select none": "Снять все",
     "Author's archive: {folder}": "Архив автора: {folder}",

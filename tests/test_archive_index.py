@@ -135,3 +135,31 @@ def test_missing_ids_keep_the_order_boosty_returned():
 
 def test_nothing_is_missing_when_everything_is_on_disk():
     assert missing_post_ids({"a", "b"}, ["a", "b"]) == []
+
+
+# --- which folder holds a post -----------------------------------------------
+
+
+def test_a_retitled_post_stays_in_its_recorded_folder(tmp_path):
+    """The author renames the post; the update must not start a new folder."""
+    from core.archive_index import locate_post_folders
+
+    (tmp_path / "2024-05-18 — Старое название").mkdir()
+    index = {"id-1": "2024-05-18 — Старое название"}
+    found = locate_post_folders(index, tmp_path, [Post("id-1", "Новое название")])
+    assert found == {"id-1": tmp_path / "2024-05-18 — Старое название"}
+
+
+def test_a_post_without_an_index_entry_is_found_by_its_folder_name(tmp_path):
+    from core.archive_index import locate_post_folders
+
+    post = Post("id-1", "Доступ к композиции")
+    folder = tmp_path / post_folder_name(post.title, post.publish_time, post.id)
+    folder.mkdir()
+    assert locate_post_folders({}, tmp_path, [post]) == {"id-1": folder}
+
+
+def test_a_post_with_no_folder_is_not_located(tmp_path):
+    from core.archive_index import locate_post_folders
+
+    assert locate_post_folders({}, tmp_path, [Post("id-1", "Нигде")]) == {}
