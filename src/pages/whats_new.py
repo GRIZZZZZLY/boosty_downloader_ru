@@ -4,10 +4,11 @@ import flet as ft
 
 import components
 from core.archive_index import (
-    author_folder,
+    downloaded_post_ids,
     load_index,
     missing_post_ids,
-    save_remote_posts,
+    remember_author_folder,
+    resolve_author_folder,
 )
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
@@ -43,6 +44,25 @@ class WhatsNewPage(ft.View):
             filled=True,
             fill_color=ft.Colors.SURFACE_CONTAINER,
             hint_style=ft.TextStyle(color=ft.Colors.GREY_600),
+        )
+        self.folder_text = ft.Text(
+            "", size=13, color=ft.Colors.ON_SURFACE_VARIANT, selectable=True
+        )
+        self.folder_row = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            visible=False,
+            controls=[
+                ft.Icon(ft.Icons.FOLDER, size=16, color=ft.Colors.ON_SURFACE_VARIANT),
+                self.folder_text,
+                ft.TextButton(
+                    t("Choose another folder"),
+                    icon=ft.Icons.FOLDER_OPEN,
+                    on_click=self.pick_folder,
+                ),
+            ],
+        )
+        self.hint_text = ft.Text(
+            "", size=13, color=ft.Colors.ORANGE, visible=False, width=640
         )
         self.status_text = ft.Text("", size=16, weight=ft.FontWeight.W_600)
         self.progress = ft.ProgressBar(
@@ -89,7 +109,9 @@ class WhatsNewPage(ft.View):
                                 color=ft.Colors.ON_SURFACE,
                                 on_click=self.check_for_new,
                             ),
+                            self.folder_row,
                             self.status_text,
+                            self.hint_text,
                             self.missing_list,
                             self.download_button,
                         ],
@@ -141,10 +163,13 @@ class WhatsNewPage(ft.View):
         self.missing_list.controls = []
         self.missing_list.visible = False
         self.download_button.visible = False
+        self.hint_text.visible = False
         self.status_text.value = t("Asking Boosty for the list of posts...")
-        self._set_busy(True)
 
-        folder = author_folder(settings.downloads_folder, author_name)
+        folder = await resolve_author_folder(settings.downloads_folder, author_name)
+        self.folder_text.value = t("Author's archive: {folder}").format(folder=folder)
+        self.folder_row.visible = True
+        self._set_busy(True)
         index = await load_index(folder)
 
         auth_token = await AuthorizationProvider.get_authorization_if_valid()
@@ -181,21 +206,9 @@ class WhatsNewPage(ft.View):
             )
             return
 
-        await save_remote_posts(
-            folder,
-            [
-                {
-                    "id": post.id,
-                    "title": post.title,
-                    "publishTime": post.publish_time,
-                    "hasAccess": post.has_access,
-                }
-                for post in remote_posts
-            ],
-        )
-
         by_id = {post.id: post for post in remote_posts}
-        missing_ids = missing_post_ids(index, by_id.keys())
+        have = downloaded_post_ids(index, folder, remote_posts)
+        missing_ids = missing_post_ids(have, by_id.keys())
         self.missing = [
             by_id[post_id] for post_id in missing_ids if by_id[post_id].has_access
         ]
@@ -212,6 +225,14 @@ class WhatsNewPage(ft.View):
             self.status_text.value += " " + t("({locked} without access)").format(
                 locked=locked
             )
+        # A silent zero looks like a fact; say where the app looked instead.
+        if remote_posts and len(missing_ids) == len(remote_posts):
+            self.hint_text.value = t(
+                "No posts of this author were found in this folder. If the archive "
+                "is somewhere else, choose that folder: the check and new downloads "
+                "will both use it."
+            )
+            self.hint_text.visible = True
 
         self.missing_list.controls = [
             ft.Text(f"{post.title or post.id}", size=13) for post in self.missing
@@ -219,6 +240,16 @@ class WhatsNewPage(ft.View):
         self.missing_list.visible = bool(self.missing)
         self.download_button.visible = bool(self.missing)
         self._set_busy(False)
+
+    async def pick_folder(self, *_):
+        """Point this author at the folder their archive actually lives in."""
+        if not self.author_name:
+            return
+        path = await ft.FilePicker().get_directory_path()
+        if not path:
+            return
+        await remember_author_folder(self.author_name, path)
+        await self.check_for_new()
 
     async def download_missing(self, *_):
         if not self.missing:

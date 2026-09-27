@@ -166,6 +166,13 @@ RU = {
     ),
     "({locked} without access)": "(из них без доступа: {locked})",
     "Download what is missing": "Скачать недостающее",
+    "Author's archive: {folder}": "Архив автора: {folder}",
+    "Choose another folder": "Выбрать другую папку",
+    "No posts of this author were found in this folder. If the archive is somewhere else, choose that folder: the check and new downloads will both use it.": (
+        "В этой папке не нашлось ни одного поста этого автора. Если архив лежит "
+        "в другом месте — выберите ту папку: и проверка, и новые загрузки будут "
+        "работать с ней."
+    ),
     # --- download image by link ------------------------------------------
     "Choose download folder": "Выберите папку для загрузки",
     "Paste here link to the image (from feed or direct messages)": (

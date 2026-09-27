@@ -8,7 +8,7 @@ from typing import Optional, List
 import aiofiles
 from aiohttp import ClientSession
 
-from core.archive_index import record_post
+from core.archive_index import record_post, resolve_author_folder
 from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.boosty.defs import (
@@ -410,7 +410,11 @@ class Task:
                 logger.error("Failed create or check home directory", exc_info=e)
                 return self._fallback(TaskError.NO_HOME_FOLDER)
 
-            author_path = Path(settings.downloads_folder) / self.author
+            # The same folder the 'What is new' check looks in, so a post it
+            # reports as missing lands next to the ones it found.
+            author_path = await resolve_author_folder(
+                settings.downloads_folder, self.author
+            )
             if settings.layout == "archive":
                 post_path = author_path / post_folder_name(
                     post_info.title or "", post_info.publish_time, self.post_id

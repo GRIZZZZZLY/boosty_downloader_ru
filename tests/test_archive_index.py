@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src"
@@ -8,21 +9,37 @@ sys.path.insert(0, str(SRC))
 
 from core.archive_index import (  # noqa: E402
     INDEX_FILE_NAME,
-    REMOTE_POSTS_FILE_NAME,
     author_folder,
+    downloaded_post_ids,
     load_index,
     missing_post_ids,
     record_post,
-    save_remote_posts,
 )
+from core.naming import post_folder_name  # noqa: E402
+
+# 2024-05-18 16:39 Moscow time.
+PUBLISH_TIME = 1716039591
+
+
+@dataclass
+class Post:
+    id: str
+    title: str
+    publish_time: int = PUBLISH_TIME
 
 
 def run(coroutine):
     return asyncio.run(coroutine)
 
 
-def test_index_lives_in_the_author_folder(tmp_path):
+# --- where the archive lives -----------------------------------------------
+
+
+def test_default_archive_folder_is_named_after_the_author(tmp_path):
     assert author_folder(str(tmp_path), "3dbaza") == tmp_path / "3dbaza"
+
+
+# --- reading and writing the index -------------------------------------------
 
 
 def test_missing_index_reads_as_empty(tmp_path):
@@ -48,6 +65,19 @@ def test_recording_a_post_keeps_the_others(tmp_path):
     }
 
 
+def test_an_unreadable_index_is_never_overwritten(tmp_path):
+    """Rewriting it from empty would replace every entry with one post."""
+    path = tmp_path / INDEX_FILE_NAME
+    path.write_text('{"id-1": "folder", BROKEN', encoding="utf-8")
+    run(record_post(tmp_path, "id-2", "new folder"))
+    assert path.read_text(encoding="utf-8") == '{"id-1": "folder", BROKEN'
+
+
+def test_writing_leaves_no_temporary_file_behind(tmp_path):
+    run(record_post(tmp_path, "id-1", "folder"))
+    assert sorted(p.name for p in tmp_path.iterdir()) == [INDEX_FILE_NAME]
+
+
 def test_recording_the_same_post_twice_changes_nothing(tmp_path):
     run(record_post(tmp_path, "id-1", "2024-05-18 — Первый"))
     before = (tmp_path / INDEX_FILE_NAME).read_text(encoding="utf-8")
@@ -55,23 +85,53 @@ def test_recording_the_same_post_twice_changes_nothing(tmp_path):
     assert (tmp_path / INDEX_FILE_NAME).read_text(encoding="utf-8") == before
 
 
-def test_index_survives_a_reread_with_non_ascii_names(tmp_path):
+def test_index_keeps_the_format_the_archive_tools_write(tmp_path):
+    """Same file as the hand-built archive: UTF-8 text, one-space indent."""
     run(record_post(tmp_path, "id-1", "2024-05-18 — Урок 1. Введение"))
-    reread = json.loads((tmp_path / INDEX_FILE_NAME).read_text(encoding="utf-8"))
-    assert reread["id-1"] == "2024-05-18 — Урок 1. Введение"
+    raw = (tmp_path / INDEX_FILE_NAME).read_text(encoding="utf-8")
+    assert "Урок 1" in raw
+    assert raw == json.dumps(
+        {"id-1": "2024-05-18 — Урок 1. Введение"}, ensure_ascii=False, indent=1
+    )
+
+
+# --- is a post already on disk ------------------------------------------------
+
+
+def test_a_post_in_the_index_counts_as_downloaded(tmp_path):
+    posts = [Post("id-1", "Первый")]
+    assert downloaded_post_ids({"id-1": "anything"}, tmp_path, posts) == {"id-1"}
+
+
+def test_a_post_folder_counts_even_without_an_index(tmp_path):
+    """The archive built by hand has folders the app would name the same way."""
+    post = Post("id-1", "Доступ к композиции")
+    (tmp_path / post_folder_name(post.title, post.publish_time, post.id)).mkdir()
+    assert downloaded_post_ids({}, tmp_path, [post]) == {"id-1"}
+
+
+def test_a_folder_in_the_original_layout_counts(tmp_path):
+    (tmp_path / "Доступ к композиции_id-1").mkdir()
+    (tmp_path / "id-2").mkdir()
+    posts = [Post("id-1", "Доступ к композиции"), Post("id-2", "")]
+    assert downloaded_post_ids({}, tmp_path, posts) == {"id-1", "id-2"}
+
+
+def test_a_file_with_the_right_name_is_not_a_post_folder(tmp_path):
+    post = Post("id-1", "Первый")
+    (tmp_path / post_folder_name(post.title, post.publish_time, post.id)).touch()
+    assert downloaded_post_ids({}, tmp_path, [post]) == set()
+
+
+def test_a_missing_folder_falls_back_to_the_index(tmp_path):
+    posts = [Post("id-1", "Первый")]
+    gone = tmp_path / "not-there"
+    assert downloaded_post_ids({"id-1": "f"}, gone, posts) == {"id-1"}
 
 
 def test_missing_ids_keep_the_order_boosty_returned():
-    index = {"b": "folder-b"}
-    assert missing_post_ids(index, ["a", "b", "c"]) == ["a", "c"]
+    assert missing_post_ids({"b"}, ["a", "b", "c"]) == ["a", "c"]
 
 
-def test_nothing_is_missing_when_the_index_covers_everything():
-    index = {"a": "f", "b": "f"}
-    assert missing_post_ids(index, ["a", "b"]) == []
-
-
-def test_remote_listing_is_saved_for_an_offline_comparison(tmp_path):
-    run(save_remote_posts(tmp_path, [{"id": "a", "title": "Пост"}]))
-    saved = json.loads((tmp_path / REMOTE_POSTS_FILE_NAME).read_text(encoding="utf-8"))
-    assert saved == [{"id": "a", "title": "Пост"}]
+def test_nothing_is_missing_when_everything_is_on_disk():
+    assert missing_post_ids({"a", "b"}, ["a", "b"]) == []
