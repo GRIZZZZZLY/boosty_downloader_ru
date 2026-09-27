@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import flet as ft
 
@@ -14,6 +15,7 @@ from core.authorization_provider import AuthorizationProvider
 from core.boosty.client import BoostyClient
 from core.downloads_manager import DownloadManager
 from core.logger import setup_logger
+from core.naming import POST_TIMEZONE
 from core.utils import get_download_settings, parse_author_link
 from i18n import t
 
@@ -31,6 +33,8 @@ class WhatsNewPage(ft.View):
         self.route = "/whats-new"
         self.manager = manager
         self.missing = []
+        # One checkbox per missing post, so the person picks what to download.
+        self.selection: dict[str, ft.Checkbox] = {}
         self.author_name = ""
 
         self.text_field = ft.TextField(
@@ -68,9 +72,26 @@ class WhatsNewPage(ft.View):
         self.progress = ft.ProgressBar(
             color=ft.Colors.ORANGE, width=500, value=None, visible=False
         )
-        self.missing_list = ft.ListView(height=260, spacing=4, visible=False)
+        self.missing_list = ft.ListView(height=260, spacing=0, visible=False)
+        self.selection_row = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            visible=False,
+            controls=[
+                ft.TextButton(
+                    t("Select all"),
+                    icon=ft.Icons.CHECK_BOX,
+                    on_click=lambda e: self._select_all(True),
+                ),
+                ft.TextButton(
+                    t("Select none"),
+                    icon=ft.Icons.CHECK_BOX_OUTLINE_BLANK,
+                    on_click=lambda e: self._select_all(False),
+                ),
+            ],
+        )
+        self.download_label = ft.Text("", size=17)
         self.download_button = ft.Button(
-            content=ft.Text(t("Download what is missing"), size=17),
+            content=self.download_label,
             icon=ft.Icon(ft.Icons.DOWNLOAD, color=ft.Colors.PRIMARY, size=16),
             height=50,
             visible=False,
@@ -112,6 +133,7 @@ class WhatsNewPage(ft.View):
                             self.folder_row,
                             self.status_text,
                             self.hint_text,
+                            self.selection_row,
                             self.missing_list,
                             self.download_button,
                         ],
@@ -160,9 +182,7 @@ class WhatsNewPage(ft.View):
 
         self.author_name = author_name
         self.missing = []
-        self.missing_list.controls = []
-        self.missing_list.visible = False
-        self.download_button.visible = False
+        self._fill_missing([])
         self.hint_text.visible = False
         self.status_text.value = t("Asking Boosty for the list of posts...")
 
@@ -234,12 +254,50 @@ class WhatsNewPage(ft.View):
             )
             self.hint_text.visible = True
 
-        self.missing_list.controls = [
-            ft.Text(f"{post.title or post.id}", size=13) for post in self.missing
-        ]
-        self.missing_list.visible = bool(self.missing)
-        self.download_button.visible = bool(self.missing)
+        self._fill_missing(self.missing)
         self._set_busy(False)
+
+    @staticmethod
+    def _post_label(post) -> str:
+        """Date first: titles like '2 Часть' are ambiguous without it."""
+        date = datetime.fromtimestamp(post.publish_time, POST_TIMEZONE)
+        return f"{date:%d.%m.%Y}  {post.title or post.id}"
+
+    def _fill_missing(self, posts) -> None:
+        """One checkbox per missing post, all ticked, as before the choice existed."""
+        self.selection = {
+            post.id: ft.Checkbox(
+                label=self._post_label(post),
+                value=True,
+                on_change=lambda e: self._refresh_download_button(),
+            )
+            for post in posts
+        }
+        self.missing_list.controls = list(self.selection.values())
+        self.missing_list.visible = bool(posts)
+        self.selection_row.visible = len(posts) > 1
+        self.download_button.visible = bool(posts)
+        self._refresh_download_button(update=False)
+
+    def _chosen(self) -> list:
+        """The missing posts whose checkbox is ticked, in the listed order."""
+        return [
+            post
+            for post in self.missing
+            if self.selection.get(post.id) and self.selection[post.id].value
+        ]
+
+    def _refresh_download_button(self, update: bool = True) -> None:
+        count = len(self._chosen())
+        self.download_label.value = t("Download selected ({count})").format(count=count)
+        self.download_button.disabled = count == 0
+        if update:
+            self.page.update()
+
+    def _select_all(self, ticked: bool, update: bool = True) -> None:
+        for checkbox in self.selection.values():
+            checkbox.value = ticked
+        self._refresh_download_button(update=update)
 
     async def pick_folder(self, *_):
         """Point this author at the folder their archive actually lives in."""
@@ -252,11 +310,12 @@ class WhatsNewPage(ft.View):
         await self.check_for_new()
 
     async def download_missing(self, *_):
-        if not self.missing:
+        chosen = self._chosen()
+        if not chosen:
             return
         self._set_busy(True)
         created = 0
-        for post in self.missing:
+        for post in chosen:
             if await self.manager.add_task(self.author_name, post.id, post):
                 created += 1
             self.status_text.value = t("{count} tasks created").format(count=created)
@@ -264,7 +323,6 @@ class WhatsNewPage(ft.View):
             await asyncio.sleep(0.05)
 
         self.missing = []
-        self.missing_list.visible = False
-        self.download_button.visible = False
+        self._fill_missing([])
         self._set_busy(False)
         await self.page.push_route("/downloads-center")

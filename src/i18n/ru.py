@@ -165,7 +165,9 @@ RU = {
         "На Boosty {total}, уже скачано {have}, не хватает {missing}"
     ),
     "({locked} without access)": "(из них без доступа: {locked})",
-    "Download what is missing": "Скачать недостающее",
+    "Download selected ({count})": "Скачать выбранное ({count})",
+    "Select all": "Выбрать все",
+    "Select none": "Снять все",
     "Author's archive: {folder}": "Архив автора: {folder}",
     "Choose another folder": "Выбрать другую папку",
     "No posts of this author were found in this folder. If the archive is somewhere else, choose that folder: the check and new downloads will both use it.": (
